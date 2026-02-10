@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0a1929</color>
+    <color name="bg_light">#132f4c</color>
+    <color name="black">#000000</color>
+    <color name="primary">#00a8a8</color>
+    <color name="primary_dark">#007f7f</color>
+    <color name="secondary">#ff6b6b</color>
+    <color name="text">#e3f2fd</color>
+    <color name="white">#FFFFFF</color>
+    <string name="app_name">MedVault</string>
+    <style name="Theme.MedVault" parent="Theme.AppCompat.Light.NoActionBar">
+        
+        <item name="colorPrimary">#00a8a8</item>
+        <item name="colorPrimaryDark">#007f7f</item>
+        <item name="colorAccent">#ff6b6b</item>
+        
+        <item name="android:statusBarColor">#0a1929</item>
+        
+        <item name="android:windowBackground">#0a1929</item>
+    </style>
+</resources>

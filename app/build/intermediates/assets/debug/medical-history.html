@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MedVault - Medical Records with Cloud Sync</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    :root {
+      --primary: #00a8a8;
+      --primary-dark: #007f7f;
+      --secondary: #ff6b6b;
+      --bg: #0a1929;
+      --bg-light: #132f4c;
+      --bg-card: #1a3a52;
+      --text: #e3f2fd;
+      --text-dim: #90caf9;
+      --border: #2e5266;
+      --success: #4caf50;
+      --warning: #ff9800;
+    }
+    
+    body {
+      font-family: 'IBM Plex Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 20% 50%, rgba(0, 168, 168, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 107, 107, 0.08) 0%, transparent 50%);
+      overflow-x: hidden;
+    }
+    
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      padding: 1.5rem 0;
+      border-bottom: 2px solid var(--border);
+      position: relative;
+    }
+    
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+      animation: slideDown 0.6s ease;
+    }
+    
+    .subtitle {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      animation: fadeIn 0.8s ease 0.2s both;
+    }
+
+    .sync-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .sync-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+
+    .sync-indicator.synced {
+      background: var(--success);
+    }
+
+    .sync-indicator.syncing {
+      background: var(--warning);
+      animation: pulse 1s infinite;
+    }
+
+    .sync-indicator.offline {
+      background: var(--secondary);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .login-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .login-box {
+      background: var(--bg-card);
+      padding: 2rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      max-width: 400px;
+      width: 100%;
+      animation: fadeSlideUp 0.6s ease;
+    }
+    
+    .login-error, .success-message, .warning-message {
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      display: none;
+      animation: fadeSlideUp 0.4s ease;
+    }
+
+    .login-error {
+      background: rgba(255, 107, 107, 0.2);
+      color: var(--secondary);
+      border: 1px solid var(--secondary);
+    }
+
+    .success-message {
+      background: rgba(76, 175, 80, 0.2);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .warning-message {
+      background: rgba(255, 152, 0, 0.2);
+      color: var(--warning);
+      border: 1px solid var(--warning);
+    }
+    
+    .login-error.show, .success-message.show, .warning-message.show {
+      display: block;
+    }
+    
+    .search-section {
+      margin-bottom: 1.5rem;
+      animation: fadeIn 0.8s ease 0.6s both;
+    }
+    
+    .search-box {
+      background: var(--bg-card);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    .search-box input {
+      flex: 1;
+      min-width: 150px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    
+    label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+    
+    input, textarea, select {
+      padding: 0.75rem;
+      background: var(--bg-light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85rem;
+      transition: all 0.3s ease;
+    }
+    
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 168, 168, 0.1);
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary:active {
+      background: var(--primary-dark);
+      transform: translateY(0);
+    }
+    
+    .btn-secondary {
+      background: var(--secondary);
+      color: white;
+    }
+    
+    .btn-secondary:active {
+      background: #ff5252;
+      transform: translateY(0);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:active {
+      background: #388e3c;
+      transform: translateY(0);
+    }
+    
+    .btn-small {
+      padding: 0.5rem 1rem;
+      font-size: 0.7rem;
+    }
+
+    /* Voice input button */
+    .voice-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+    }
+
+    .voice-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    .voice-btn.listening {
+      background: var(--secondary);
+      animation: pulse 1s infinite;
+    }
+
+    .input-with-voice {
+      position: relative;
+    }
+
+    .input-with-voice input,
+    .input-with-voice textarea {
+      padding-right: 50px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .modal.show {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: var(--bg-card);
+      padding: 2rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: fadeSlideUp 0.3s ease;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 2rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-card);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    thead {
+      background: var(--bg-light);
+    }
+
+    th {
+      padding: 1rem;
+      text-align: left;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+    }
+
+    td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    tr:hover {
+      background: rgba(0, 168, 168, 0.05);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-dim);
+    }
+
+    .actions-cell {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+
+    @media (max-width: 768px) {
+      table {
+        font-size: 0.75rem;
+      }
+
+      th, td {
+        padding: 0.75rem 0.5rem;
+      }
+
+      th {
+        font-size: 0.65rem;
+      }
+
+      .search-box {
+        flex-direction: column;
+      }
+
+      .search-box input,
+      .search-box button {
+        width: 100%;
+      }
+
+      .actions-cell {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen" class="login-container">
+    <div class="login-box">
+      <h1 style="margin-bottom: 0.5rem;">MedVault</h1>
+      <p class="subtitle" style="margin-bottom: 2rem;">Secure Medical Records</p>
+      
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="login-name" placeholder="Enter your full name">
+      </div>
+      
+      <div class="form-group">
+        <label>PIN</label>
+        <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6">
+      </div>
+      
+      <div id="login-error" class="login-error"></div>
+      
+      <button class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" onclick="login()">Login</button>
+
+      <div style="text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 1rem;">
+        ☁️ Multi-user sync via Google Drive<br>
+        🎤 Voice input support
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div class="container" id="main-app" style="display: none;">
+    <header>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="flex: 1;">
+          <h1>MedVault</h1>
+          <p class="subtitle">Patient Records System</p>
+        </div>
+        <button class="btn btn-secondary btn-small" onclick="logout()">Logout</button>
+      </div>
+      <div id="user-info" style="text-align: center; color: var(--text-dim); font-size: 0.8rem;"></div>
+      
+      <div class="sync-status">
+        <span class="sync-indicator" id="sync-indicator"></span>
+        <span id="sync-text">Checking sync status...</span>
+        <button class="btn btn-success btn-small" onclick="manualSync()" id="sync-btn" style="margin-left: 0.5rem;">
+          ☁️ Sync Now
+        </button>
+      </div>
+    </header>
+
+    <!-- Messages -->
+    <div id="success-message" class="success-message"></div>
+    <div id="warning-message" class="warning-message"></div>
+
+    <!-- Search Bar and Add Button -->
+    <div class="search-section">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Search by exact patient name or patient ID...">
+        <button class="btn btn-primary btn-small" onclick="searchRecords()">Search</button>
+        <button class="btn btn-secondary btn-small" onclick="clearSearch()">Show All</button>
+        <button class="btn btn-primary btn-small" onclick="showAddForm()">+ Add Patient Record</button>
+      </div>
+    </div>
+
+    <!-- Patient Records Table -->
+    <div style="overflow-x: auto;">
+      <table id="records-table">
+        <thead>
+          <tr>
+            <th>Patient Name</th>
+            <th>Patient ID</th>
+            <th>Date of Visit</th>
+            <th>Diagnosis</th>
+            <th>Medicines</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="records-body">
+          <tr>
+            <td colspan="6" class="empty-state">No records found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add/Edit Patient Record Modal -->
+  <div id="patient-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Add Patient Record</h2>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+
+      <form id="patient-form" onsubmit="savePatientRecord(event)">
+        <div class="form-group">
+          <label>Patient Name <span style="color: var(--secondary);">*</span></label>
+          <div class="input-with-voice">
+            <input type="text" id="patient-name" placeholder="e.g., John Doe" required list="patient-names-list">
+            <button type="button" class="voice-btn" onclick="startVoiceInput('patient-name')" title="Voice input">🎤</button>
+          </div>
+          <datalist id="patient-names-list"></datalist>
+        </div>
+
+        <div class="form-group">
+          <label>Date of Visit <span style="color: var(--secondary);">*</span></label>
+          <input type="date" id="date-of-visit" required>
+        </div>
+
+        <div class="form-group">
+          <label>Diagnosis <span style="color: var(--secondary);">*</span></label>
+          <div class="input-with-voice">
+            <textarea id="diagnosis" placeholder="Speak or type diagnosis details..." required></textarea>
+            <button type="button" class="voice-btn" onclick="startVoiceInput('diagnosis')" title="Voice input" style="top: 20px;">🎤</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Medicines <span style="color: var(--secondary);">*</span></label>
+          <div class="input-with-voice">
+            <textarea id="medicines" placeholder="Speak or type prescribed medicines..." required></textarea>
+            <button type="button" class="voice-btn" onclick="startVoiceInput('medicines')" title="Voice input" style="top: 20px;">🎤</button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save Record</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Storage adapters
+    const storage = {
+      async set(key, value) {
+        try {
+          if (typeof AndroidStorage !== 'undefined') {
+            AndroidStorage.setItem(key, value);
+            return { key, value };
+          } else {
+            localStorage.setItem(key, value);
+            return { key, value };
+          }
+        } catch (e) {
+          console.error('Storage set error:', e);
+          throw e;
+        }
+      },
+      
+      async get(key) {
+        try {
+          let value;
+          if (typeof AndroidStorage !== 'undefined') {
+            value = AndroidStorage.getItem(key);
+          } else {
+            value = localStorage.getItem(key);
+          }
+          return value ? { key, value } : null;
+        } catch (e) {
+          console.error('Storage get error:', e);
+          return null;
+        }
+      },
+      
+      async delete(key) {
+        try {
+          if (typeof AndroidStorage !== 'undefined') {
+            AndroidStorage.removeItem(key);
+          } else {
+            localStorage.removeItem(key);
+          }
+          return { key, deleted: true };
+        } catch (e) {
+          console.error('Storage delete error:', e);
+          throw e;
+        }
+      }
+    };
+    
+    window.storage = storage;
+
+    // Voice Recognition Setup
+    let recognition = null;
+    let currentVoiceField = null;
+
+    function initVoiceRecognition() {
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US'; // Change to 'hi-IN' for Hindi or other languages
+        
+        recognition.onresult = function(event) {
+          const transcript = event.results[0][0].transcript;
+          if (currentVoiceField) {
+            const field = document.getElementById(currentVoiceField);
+            if (field) {
+              // Append to existing text if any
+              field.value = field.value ? field.value + ' ' + transcript : transcript;
+            }
+          }
+          stopVoiceInput();
+        };
+        
+        recognition.onerror = function(event) {
+          console.error('Speech recognition error:', event.error);
+          showWarningMessage('Voice input error: ' + event.error);
+          stopVoiceInput();
+        };
+        
+        recognition.onend = function() {
+          stopVoiceInput();
+        };
+      }
+    }
+
+    function startVoiceInput(fieldId) {
+      if (!recognition) {
+        showWarningMessage('Voice input not supported in this browser');
+        return;
+      }
+      
+      currentVoiceField = fieldId;
+      const voiceBtn = event.target;
+      voiceBtn.classList.add('listening');
+      voiceBtn.textContent = '🔴';
+      
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error('Recognition start error:', e);
+        stopVoiceInput();
+      }
+    }
+
+    function stopVoiceInput() {
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch (e) {
+          // Already stopped
+        }
+      }
+      
+      // Reset all voice buttons
+      document.querySelectorAll('.voice-btn').forEach(btn => {
+        btn.classList.remove('listening');
+        btn.textContent = '🎤';
+      });
+      
+      currentVoiceField = null;
+    }
+
+    // Google Drive interface
+    const GoogleDriveSync = {
+      isSignedIn() {
+        if (typeof GoogleDrive !== 'undefined') {
+          return GoogleDrive.isSignedIn();
+        }
+        return false;
+      },
+
+      signIn() {
+        if (typeof GoogleDrive !== 'undefined') {
+          GoogleDrive.signIn();
+        } else {
+          showWarningMessage('Google Drive not available in web version');
+        }
+      },
+
+      async uploadData() {
+        const allData = {
+          records: await loadData('patient-records'),
+          patientMap: await loadData('patient-id-map'),
+          lastSync: new Date().toISOString()
+        };
+
+        const dataJson = JSON.stringify(allData).replace(/"/g, '\\"');
+        
+        if (typeof GoogleDrive !== 'undefined') {
+          updateSyncStatus('syncing', 'Uploading to Google Drive...');
+          GoogleDrive.syncToCloud(dataJson);
+        } else {
+          console.log('Would upload:', allData);
+          showWarningMessage('Running in web mode - data saved locally only');
+        }
+      },
+
+      async downloadData() {
+        if (typeof GoogleDrive !== 'undefined') {
+          updateSyncStatus('syncing', 'Downloading from Google Drive...');
+          GoogleDrive.syncFromCloud();
+        }
+      }
+    };
+
+    // Callbacks from native code
+    window.onDriveReady = function(isReady) {
+      if (isReady) {
+        updateSyncStatus('synced', 'Google Drive connected');
+        showSuccessMessage('✓ Connected to Google Drive');
+      } else {
+        updateSyncStatus('offline', 'Not connected to Drive');
+      }
+    };
+
+    window.onSyncComplete = function(success, message) {
+      if (success) {
+        updateSyncStatus('synced', 'Last synced: just now');
+        showSuccessMessage('✓ ' + message);
+      } else {
+        updateSyncStatus('offline', 'Sync failed');
+        showWarningMessage('⚠ ' + message);
+      }
+    };
+
+    window.onDataReceived = function(dataJson) {
+      try {
+        const data = JSON.parse(dataJson);
+        mergeData(data);
+        updateSyncStatus('synced', 'Synced successfully');
+        showSuccessMessage('✓ Data synced from Google Drive');
+        loadRecords();
+      } catch (e) {
+        console.error('Error processing remote data:', e);
+        showWarningMessage('⚠ Error syncing data');
+      }
+    };
+
+    async function mergeData(remoteData) {
+      const localRecords = await loadData('patient-records');
+      const remoteRecords = remoteData.records || [];
+      const mergedRecords = [...localRecords];
+      
+      remoteRecords.forEach(remoteRecord => {
+        const existingIndex = mergedRecords.findIndex(r => r.id === remoteRecord.id);
+        if (existingIndex === -1) {
+          mergedRecords.push(remoteRecord);
+        } else {
+          if (new Date(remoteRecord.timestamp) > new Date(mergedRecords[existingIndex].timestamp)) {
+            mergedRecords[existingIndex] = remoteRecord;
+          }
+        }
+      });
+      
+      await saveData('patient-records', mergedRecords);
+      
+      if (remoteData.patientMap) {
+        await saveData('patient-id-map', remoteData.patientMap);
+      }
+    }
+
+    function updateSyncStatus(status, text) {
+      const indicator = document.getElementById('sync-indicator');
+      const syncText = document.getElementById('sync-text');
+      indicator.className = 'sync-indicator ' + status;
+      syncText.textContent = text;
+    }
+
+    async function manualSync() {
+      await GoogleDriveSync.downloadData();
+      setTimeout(() => {
+        GoogleDriveSync.uploadData();
+      }, 1000);
+    }
+
+    setInterval(() => {
+      if (GoogleDriveSync.isSignedIn()) {
+        GoogleDriveSync.downloadData();
+      }
+    }, 300000);
+
+    const CORRECT_PIN = '258411';
+    let currentUser = null;
+    let searchActive = false;
+    let editingRecordId = null;
+
+    async function getOrCreatePatientId(patientName) {
+      const patientMap = await loadData('patient-id-map');
+      const existing = patientMap.find(p => p.name === patientName);
+      if (existing) {
+        return existing.id;
+      }
+      const newId = 'MED-' + Date.now().toString().slice(-8);
+      patientMap.push({ name: patientName, id: newId });
+      await saveData('patient-id-map', patientMap);
+      return newId;
+    }
+
+    async function getPatientNames() {
+      const patientMap = await loadData('patient-id-map');
+      return patientMap.map(p => p.name);
+    }
+
+    async function updatePatientNameSuggestions() {
+      const names = await getPatientNames();
+      const datalist = document.getElementById('patient-names-list');
+      datalist.innerHTML = names.map(name => `<option value="${name}">`).join('');
+    }
+
+    function login() {
+      const name = document.getElementById('login-name').value.trim();
+      const pin = document.getElementById('login-pin').value.trim();
+      if (!name) {
+        showLoginError('Please enter your full name');
+        return;
+      }
+      if (pin !== CORRECT_PIN) {
+        showLoginError('Invalid PIN. Access denied.');
+        return;
+      }
+      currentUser = name;
+      if (typeof AndroidStorage !== 'undefined') {
+        AndroidStorage.setItem('medvault_user', name);
+      } else {
+        localStorage.setItem('medvault_user', name);
+      }
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('main-app').style.display = 'block';
+      document.getElementById('user-info').textContent = `Logged in as: ${name}`;
+      
+      // Initialize voice recognition
+      initVoiceRecognition();
+      
+      if (!GoogleDriveSync.isSignedIn()) {
+        setTimeout(() => {
+          if (confirm('Connect to Google Drive for multi-user sync?')) {
+            GoogleDriveSync.signIn();
+          } else {
+            updateSyncStatus('offline', 'Working offline only');
+          }
+        }, 500);
+      }
+      
+      loadRecords();
+      updatePatientNameSuggestions();
+      
+      if (GoogleDriveSync.isSignedIn()) {
+        GoogleDriveSync.downloadData();
+      }
+    }
+
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        currentUser = null;
+        if (typeof AndroidStorage !== 'undefined') {
+          AndroidStorage.removeItem('medvault_user');
+        } else {
+          localStorage.removeItem('medvault_user');
+        }
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('main-app').style.display = 'none';
+        document.getElementById('login-name').value = '';
+        document.getElementById('login-pin').value = '';
+      }
+    }
+
+    function showLoginError(message) {
+      const errorDiv = document.getElementById('login-error');
+      errorDiv.textContent = message;
+      errorDiv.classList.add('show');
+      setTimeout(() => errorDiv.classList.remove('show'), 3000);
+    }
+
+    function showSuccessMessage(message) {
+      const successDiv = document.getElementById('success-message');
+      successDiv.textContent = message;
+      successDiv.classList.add('show');
+      setTimeout(() => successDiv.classList.remove('show'), 3000);
+    }
+
+    function showWarningMessage(message) {
+      const warningDiv = document.getElementById('warning-message');
+      warningDiv.textContent = message;
+      warningDiv.classList.add('show');
+      setTimeout(() => warningDiv.classList.remove('show'), 3000);
+    }
+
+    function showAddForm() {
+      editingRecordId = null;
+      document.getElementById('modal-title').textContent = 'Add Patient Record';
+      document.getElementById('patient-form').reset();
+      document.getElementById('patient-modal').classList.add('show');
+    }
+
+    // NEW: Edit functionality
+    async function editRecord(recordId) {
+      const records = await loadData('patient-records');
+      const record = records.find(r => r.id === recordId);
+      
+      if (!record) {
+        showWarningMessage('Record not found');
+        return;
+      }
+      
+      editingRecordId = recordId;
+      document.getElementById('modal-title').textContent = 'Edit Patient Record';
+      document.getElementById('patient-name').value = record.patientName;
+      document.getElementById('date-of-visit').value = record.dateOfVisit;
+      document.getElementById('diagnosis').value = record.diagnosis;
+      document.getElementById('medicines').value = record.medicines;
+      
+      document.getElementById('patient-modal').classList.add('show');
+    }
+
+    function closeModal() {
+      document.getElementById('patient-modal').classList.remove('show');
+      editingRecordId = null;
+      stopVoiceInput(); // Stop any ongoing voice input
+    }
+
+    function isWithinLast15Days(dateString) {
+      const recordDate = new Date(dateString);
+      const fifteenDaysAgo = new Date();
+      fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+      return recordDate >= fifteenDaysAgo;
+    }
+
+    function searchRecords() {
+      const searchTerm = document.getElementById('search-input').value.trim();
+      if (!searchTerm) {
+        alert('Please enter a patient name or ID to search');
+        return;
+      }
+      console.log('Searching for:', searchTerm);
+      searchActive = true;
+      loadRecords();
+    }
+
+    function clearSearch() {
+      console.log('Clearing search');
+      searchActive = false;
+      document.getElementById('search-input').value = '';
+      loadRecords();
+    }
+
+    async function saveData(key, data) {
+      try {
+        await window.storage.set(key, JSON.stringify(data));
+        console.log('Saved to storage:', key, data);
+      } catch (error) {
+        console.error('Error saving data:', error);
+        alert('Failed to save data. Please try again.');
+      }
+    }
+
+    async function loadData(key) {
+      try {
+        const result = await window.storage.get(key);
+        return result ? JSON.parse(result.value) : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    async function deleteData(key, id) {
+      const data = await loadData(key);
+      const filtered = data.filter(item => item.id !== id);
+      await saveData(key, filtered);
+    }
+
+    async function savePatientRecord(event) {
+      event.preventDefault();
+      const patientName = document.getElementById('patient-name').value.trim();
+      const dateOfVisit = document.getElementById('date-of-visit').value;
+      const diagnosis = document.getElementById('diagnosis').value.trim();
+      const medicines = document.getElementById('medicines').value.trim();
+
+      if (!patientName || !dateOfVisit || !diagnosis || !medicines) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const patientId = await getOrCreatePatientId(patientName);
+      const record = {
+        id: editingRecordId || Date.now(),
+        patientName,
+        patientId,
+        dateOfVisit,
+        diagnosis,
+        medicines,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('Saving record:', record);
+
+      const records = await loadData('patient-records');
+      if (editingRecordId) {
+        const index = records.findIndex(r => r.id === editingRecordId);
+        if (index !== -1) {
+          records[index] = record;
+          showSuccessMessage(`✓ Record for ${patientName} updated successfully!`);
+        }
+      } else {
+        records.push(record);
+        showSuccessMessage(`✓ Record for ${patientName} saved successfully!`);
+      }
+
+      await saveData('patient-records', records);
+      await updatePatientNameSuggestions();
+      
+      closeModal();
+      
+      if (searchActive) {
+        clearSearch();
+      } else {
+        loadRecords();
+      }
+
+      if (GoogleDriveSync.isSignedIn()) {
+        setTimeout(() => GoogleDriveSync.uploadData(), 500);
+      }
+    }
+
+    async function loadRecords() {
+      console.log('Loading records... Search active:', searchActive);
+      const allRecords = await loadData('patient-records');
+      console.log('All records:', allRecords);
+      
+      const searchTerm = document.getElementById('search-input').value.trim();
+      
+      let records;
+      if (searchActive && searchTerm) {
+        records = allRecords.filter(r => 
+          r.patientName === searchTerm || r.patientId === searchTerm
+        );
+        console.log('Filtered by search term:', searchTerm, 'Found:', records);
+      } else if (!searchActive) {
+        records = allRecords.filter(r => isWithinLast15Days(r.dateOfVisit));
+        console.log('Filtered by last 15 days:', records);
+      } else {
+        records = allRecords;
+      }
+
+      const tbody = document.getElementById('records-body');
+      if (records.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="empty-state">
+              ${searchActive ? 'No matching records found for "' + searchTerm + '"' : 'No records in the last 15 days. Click "Show All" or use search to see older records.'}
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      records.sort((a, b) => new Date(b.dateOfVisit) - new Date(a.dateOfVisit));
+      
+      tbody.innerHTML = records.map(record => `
+        <tr>
+          <td>${record.patientName}</td>
+          <td>${record.patientId}</td>
+          <td>${new Date(record.dateOfVisit).toLocaleDateString()}</td>
+          <td>${record.diagnosis}</td>
+          <td>${record.medicines}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})">Edit</button>
+              <button class="btn btn-secondary btn-small" onclick="deleteRecord(${record.id})">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      
+      console.log('Displayed', records.length, 'records');
+    }
+
+    async function deleteRecord(id) {
+      if (confirm('Are you sure you want to delete this record?')) {
+        await deleteData('patient-records', id);
+        showSuccessMessage('✓ Record deleted successfully!');
+        loadRecords();
+        
+        if (GoogleDriveSync.isSignedIn()) {
+          setTimeout(() => GoogleDriveSync.uploadData(), 500);
+        }
+      }
+    }
+
+    window.addEventListener('load', () => {
+      let savedUser;
+      if (typeof AndroidStorage !== 'undefined') {
+        savedUser = AndroidStorage.getItem('medvault_user');
+      } else {
+        savedUser = localStorage.getItem('medvault_user');
+      }
+      
+      if (savedUser) {
+        currentUser = savedUser;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'block';
+        document.getElementById('user-info').textContent = `Logged in as: ${savedUser}`;
+        
+        // Initialize voice recognition
+        initVoiceRecognition();
+        
+        updateSyncStatus('offline', 'Checking connection...');
+        loadRecords();
+        updatePatientNameSuggestions();
+        
+        setTimeout(() => {
+          if (GoogleDriveSync.isSignedIn()) {
+            GoogleDriveSync.downloadData();
+          } else {
+            updateSyncStatus('offline', 'Working offline - Click to sync');
+          }
+        }, 1000);
+      }
+
+      document.getElementById('login-pin').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') login();
+      });
+      
+      document.getElementById('search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchRecords();
+      });
+    });
+  </script>
+</body>
+</html>
