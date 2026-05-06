@@ -405,3 +405,4 @@ Free to use for medical record management.
 ## 🆘 Need Help?
 
 Check troubleshooting section or review the setup steps again.
+Test sync
