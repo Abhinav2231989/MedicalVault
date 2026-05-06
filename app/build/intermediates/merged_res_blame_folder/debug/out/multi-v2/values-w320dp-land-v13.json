@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.medvault.app-mergeDebugResources-32:/values-w320dp-land-v13/values-w320dp-land-v13.xml",
+            "outputFile": "com.medvault.app-mergeDebugResources-2:/values-w320dp-land-v13/values-w320dp-land-v13.xml",
             "map": [
                 {
                     "source": "C:\\Users\\AbhinavShaurya\\.gradle\\caches\\transforms-3\\5770026167c130682055c6e792ddcbfd\\transformed\\material-1.11.0\\res\\values-w320dp-land-v13\\values-w320dp-land-v13.xml",

@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.medvault.app-mergeDebugResources-32:/values-zh-rCN/values-zh-rCN.xml",
+            "outputFile": "com.medvault.app-mergeDebugResources-2:/values-zh-rCN/values-zh-rCN.xml",
             "map": [
                 {
                     "source": "C:\\Users\\AbhinavShaurya\\.gradle\\caches\\transforms-3\\31d979b205dee59d21a56dcfb14c6291\\transformed\\core-1.12.0\\res\\values-zh-rCN\\values-zh-rCN.xml",
