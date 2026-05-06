@@ -1,4 +1,4 @@
-name: Sync to GitLab
+name: Sync to GitLab from Github
 
 on:
   push:
