@@ -266,7 +266,6 @@
       font-size: 0.7rem;
     }
 
-    /* Voice input button */
     .voice-btn {
       position: absolute;
       right: 10px;
@@ -474,7 +473,71 @@
         flex-direction: column;
       }
     }
-  </style>
+  
+    .autocomplete-container {
+      position: relative;
+      width: 100%;
+    }
+
+    .autocomplete-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .autocomplete-suggestions.show {
+      display: block;
+    }
+
+    .autocomplete-suggestion {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .autocomplete-suggestion:last-child {
+      border-bottom: none;
+    }
+
+    .autocomplete-suggestion:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    .autocomplete-suggestion.selected {
+      background: var(--primary);
+      color: white;
+    }
+
+    .autocomplete-match {
+      font-weight: bold;
+      color: var(--primary);
+    }
+
+    .autocomplete-suggestion:hover .autocomplete-match {
+      color: white;
+    }
+
+    .autocomplete-category {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+</style>
+
+  <!-- Reports and Status Features CSS -->
+  <link rel="stylesheet" href="reports-status.css">
 </head>
 <body>
   <!-- Login Screen -->
@@ -551,12 +614,14 @@
             <th>DATE OF VISIT</th>
             <th>DIAGNOSIS</th>
             <th>MEDICINE</th>
+            <th>REPORTS</th>
+            <th>STATUS</th>
             <th style="width: 80px;">ACTIONS</th>
           </tr>
         </thead>
         <tbody id="records-body">
           <tr>
-            <td colspan="7" class="empty-state">No records found</td>
+            <td colspan="9" class="empty-state">No records found</td>
           </tr>
         </tbody>
       </table>
@@ -594,16 +659,30 @@
         <div class="form-group">
           <label>Diagnosis <span style="color: var(--secondary);">*</span></label>
           <div class="input-with-voice">
+            <div class="autocomplete-container">
             <textarea id="diagnosis" placeholder="Speak or type diagnosis details..." required></textarea>
+            <div id="diagnosis-suggestions" class="autocomplete-suggestions"></div>
+          </div>
             <button type="button" class="voice-btn" onclick="startVoiceInput('diagnosis')" title="Voice input" style="top: 20px;">🎤</button>
           </div>
         </div>
 
         <div class="form-group">
-          <label>Medicines <span style="color: var(--secondary);">*</span></label>
+          <label>Medicines <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
           <div class="input-with-voice">
-            <textarea id="medicines" placeholder="Speak or type prescribed medicines..." required></textarea>
+            <textarea id="medicines" placeholder="Speak or type prescribed medicines (optional)..."></textarea>
             <button type="button" class="voice-btn" onclick="startVoiceInput('medicines')" title="Voice input" style="top: 20px;">🎤</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Reports <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
+          <div class="file-upload-container">
+            <input type="file" id="reports-input" multiple accept="image/*,.pdf,.doc,.docx" style="display: none;" onchange="handleFileSelect(event)">
+            <button type="button" class="file-upload-btn" onclick="document.getElementById('reports-input').click()">
+              📎 Add Reports
+            </button>
+            <div id="file-list" class="file-list"></div>
           </div>
         </div>
 
@@ -615,7 +694,19 @@
     </div>
   </div>
 
+  <!-- Reports and Status Features JavaScript - MUST LOAD FIRST -->
+  <script src="reports-status.js"></script>
+
   <script>
+    // Wait for reports-status.js to load before defining other functions
+    window.addEventListener('DOMContentLoaded', function() {
+      // Check if external functions are loaded
+      if (typeof clearSelectedFiles === 'undefined') {
+        console.error('reports-status.js did not load properly!');
+        alert('Error: External scripts not loaded. Please ensure reports-status.js is in the same folder.');
+      }
+    });
+
     // Storage adapters
     const storage = {
       async set(key, value) {
@@ -675,14 +766,13 @@
         recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = 'en-US'; // Change to 'hi-IN' for Hindi or other languages
+        recognition.lang = 'en-US';
         
         recognition.onresult = function(event) {
           const transcript = event.results[0][0].transcript;
           if (currentVoiceField) {
             const field = document.getElementById(currentVoiceField);
             if (field) {
-              // Append to existing text if any
               field.value = field.value ? field.value + ' ' + transcript : transcript;
             }
           }
@@ -729,7 +819,6 @@
         }
       }
       
-      // Reset all voice buttons
       document.querySelectorAll('.voice-btn').forEach(btn => {
         btn.classList.remove('listening');
         btn.textContent = '🎤';
@@ -858,14 +947,13 @@
     }, 300000);
 
     const CORRECT_PIN = '258411';
-    const AUTO_LOGOUT_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
+    const AUTO_LOGOUT_TIME = 15 * 60 * 1000;
     let currentUser = null;
     let searchActive = false;
     let editingRecordId = null;
     let inactivityTimer = null;
     let lastActivityTime = Date.now();
 
-    // Auto-logout functionality
     function resetInactivityTimer() {
       lastActivityTime = Date.now();
       
@@ -884,13 +972,12 @@
       if (currentUser) {
         showWarningMessage('⚠ Session expired due to inactivity. Please login again.');
         setTimeout(() => {
-          logout(true); // true = auto logout
+          logout(true);
         }, 2000);
       }
     }
 
     function setupActivityListeners() {
-      // Track user activity
       const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
       
       events.forEach(event => {
@@ -946,8 +1033,10 @@
       document.getElementById('main-app').style.display = 'block';
       document.getElementById('user-info').textContent = `Logged in as: ${name}`;
       
-      // Initialize voice recognition
       initVoiceRecognition();
+      
+      // Initialize autocomplete - diagnosis only (medicines autocomplete removed)
+      handleAutocomplete('diagnosis', commonDiagnoses);
       
       if (!GoogleDriveSync.isSignedIn()) {
         setTimeout(() => {
@@ -961,8 +1050,6 @@
       
       loadRecords();
       updatePatientNameSuggestions();
-      
-      // Start inactivity timer
       resetInactivityTimer();
       
       if (GoogleDriveSync.isSignedIn()) {
@@ -972,16 +1059,13 @@
 
     function logout(isAutoLogout = false) {
       if (isAutoLogout) {
-        // Auto-logout - no confirmation needed
         performLogout();
       } else {
-        // Manual logout - show custom confirmation
         showLogoutConfirmation();
       }
     }
 
     function showLogoutConfirmation() {
-      // Show warning message with confirmation
       const confirmMsg = document.getElementById('warning-message');
       confirmMsg.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1007,7 +1091,6 @@
     }
 
     function performLogout() {
-      // Clear inactivity timer
       if (inactivityTimer) {
         clearTimeout(inactivityTimer);
         inactivityTimer = null;
@@ -1050,10 +1133,13 @@
       editingRecordId = null;
       document.getElementById('modal-title').textContent = 'Add Patient Record';
       document.getElementById('patient-form').reset();
+      // Safe call - check if function exists
+      if (typeof clearSelectedFiles === 'function') {
+        clearSelectedFiles();
+      }
       document.getElementById('patient-modal').classList.add('show');
     }
 
-    // NEW: Edit functionality
     async function editRecord(recordId) {
       const records = await loadData('patient-records');
       const record = records.find(r => r.id === recordId);
@@ -1069,15 +1155,24 @@
       document.getElementById('phone-number').value = record.phoneNumber || '';
       document.getElementById('date-of-visit').value = record.dateOfVisit;
       document.getElementById('diagnosis').value = record.diagnosis;
-      document.getElementById('medicines').value = record.medicines;
+      document.getElementById('medicines').value = record.medicines || '';
+      
+      // Safe call - check if function exists
+      if (typeof loadSelectedFiles === 'function') {
+        loadSelectedFiles(record.reports || []);
+      }
       
       document.getElementById('patient-modal').classList.add('show');
     }
 
     function closeModal() {
       document.getElementById('patient-modal').classList.remove('show');
+      // Safe call - check if function exists
+      if (typeof clearSelectedFiles === 'function') {
+        clearSelectedFiles();
+      }
       editingRecordId = null;
-      stopVoiceInput(); // Stop any ongoing voice input
+      stopVoiceInput();
     }
 
     function isWithinLast15Days(dateString) {
@@ -1093,13 +1188,11 @@
         alert('Please enter a patient name, ID, or phone number to search');
         return;
       }
-      console.log('Searching for:', searchTerm);
       searchActive = true;
       loadRecords();
     }
 
     function clearSearch() {
-      console.log('Clearing search');
       searchActive = false;
       document.getElementById('search-input').value = '';
       loadRecords();
@@ -1108,7 +1201,6 @@
     async function saveData(key, data) {
       try {
         await window.storage.set(key, JSON.stringify(data));
-        console.log('Saved to storage:', key, data);
       } catch (error) {
         console.error('Error saving data:', error);
         alert('Failed to save data. Please try again.');
@@ -1138,12 +1230,22 @@
       const diagnosis = document.getElementById('diagnosis').value.trim();
       const medicines = document.getElementById('medicines').value.trim();
 
-      if (!patientName || !phoneNumber || !dateOfVisit || !diagnosis || !medicines) {
+      if (!patientName || !phoneNumber || !dateOfVisit || !diagnosis) {
         alert('Please fill in all required fields');
         return;
       }
 
       const patientId = await getOrCreatePatientId(patientName);
+      
+      // Safe call - check if function exists
+      const status = (typeof calculateStatus === 'function') ? calculateStatus(medicines) : (medicines ? 'Complete' : 'In Progress');
+      
+      // Safe call - check if function exists
+      let reports = [];
+      if (typeof getSelectedFiles === 'function') {
+        reports = getSelectedFiles().length > 0 ? getSelectedFiles() : (editingRecordId ? (await loadData('patient-records')).find(r => r.id === editingRecordId)?.reports || [] : []);
+      }
+      
       const record = {
         id: editingRecordId || Date.now(),
         patientName,
@@ -1151,11 +1253,11 @@
         phoneNumber,
         dateOfVisit,
         diagnosis,
-        medicines,
+        medicines: medicines || '',
+        reports: reports,
+        status: status,
         timestamp: new Date().toISOString()
       };
-
-      console.log('Saving record:', record);
 
       const records = await loadData('patient-records');
       if (editingRecordId) {
@@ -1172,6 +1274,10 @@
       await saveData('patient-records', records);
       await updatePatientNameSuggestions();
       
+      // Safe call - check if function exists
+      if (typeof clearSelectedFiles === 'function') {
+        clearSelectedFiles();
+      }
       closeModal();
       
       if (searchActive) {
@@ -1186,10 +1292,7 @@
     }
 
     async function loadRecords() {
-      console.log('Loading records... Search active:', searchActive);
       const allRecords = await loadData('patient-records');
-      console.log('All records:', allRecords);
-      
       const searchTerm = document.getElementById('search-input').value.trim();
       
       let records;
@@ -1199,10 +1302,8 @@
           r.patientId.toLowerCase().includes(searchTerm.toLowerCase()) || 
           (r.phoneNumber && r.phoneNumber.includes(searchTerm))
         );
-        console.log('Filtered by search term:', searchTerm, 'Found:', records);
       } else if (!searchActive) {
         records = allRecords.filter(r => isWithinLast15Days(r.dateOfVisit));
-        console.log('Filtered by last 15 days:', records);
       } else {
         records = allRecords;
       }
@@ -1211,7 +1312,7 @@
       if (records.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" class="empty-state">
+            <td colspan="9" class="empty-state">
               ${searchActive ? 'No matching records found for "' + searchTerm + '"' : 'No records in the last 15 days. Click "Show All" or use search to see older records.'}
             </td>
           </tr>
@@ -1230,7 +1331,15 @@
           <td>${record.phoneNumber || 'N/A'}</td>
           <td>${new Date(record.dateOfVisit).toLocaleDateString()}</td>
           <td>${record.diagnosis}</td>
-          <td>${record.medicines}</td>
+          <td>${record.medicines || '<span style="color: var(--text-dim); font-style: italic;">Not prescribed yet</span>'}</td>
+          <td class="reports-cell">
+            ${record.reports && record.reports.length > 0
+              ? `<span class="reports-link" onclick="viewReports(${record.id})">${record.reports.length} file(s)</span>`
+              : '<span class="no-reports">No reports</span>'}
+          </td>
+          <td style="text-align: center;">
+            <span class="status-badge status-${(record.status || 'In Progress').toLowerCase().replace(' ', '')}">${record.status || 'In Progress'}</span>
+          </td>
           <td>
             <div class="actions-cell">
               <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})" title="Edit record">✏️</button>
@@ -1239,8 +1348,6 @@
           </td>
         </tr>
       `).join('');
-      
-      console.log('Displayed', records.length, 'records');
     }
 
     async function deleteRecord(id) {
@@ -1255,8 +1362,161 @@
       }
     }
 
+    // Medical Autocomplete Data
+    const commonDiagnoses = [
+      { name: "Hypertension", category: "Cardiovascular" },
+      { name: "Type 2 Diabetes Mellitus", category: "Endocrine" },
+      { name: "Type 1 Diabetes Mellitus", category: "Endocrine" },
+      { name: "Asthma", category: "Respiratory" },
+      { name: "COPD (Chronic Obstructive Pulmonary Disease)", category: "Respiratory" },
+      { name: "Pneumonia", category: "Respiratory" },
+      { name: "Bronchitis", category: "Respiratory" },
+      { name: "Upper Respiratory Tract Infection", category: "Respiratory" },
+      { name: "Gastroesophageal Reflux Disease (GERD)", category: "Digestive" },
+      { name: "Gastritis", category: "Digestive" },
+      { name: "Peptic Ulcer", category: "Digestive" },
+      { name: "Irritable Bowel Syndrome (IBS)", category: "Digestive" },
+      { name: "Urinary Tract Infection (UTI)", category: "Urinary" },
+      { name: "Migraine", category: "Neurological" },
+      { name: "Tension Headache", category: "Neurological" },
+      { name: "Anxiety Disorder", category: "Mental Health" },
+      { name: "Depression", category: "Mental Health" },
+      { name: "Arthritis", category: "Musculoskeletal" },
+      { name: "Osteoarthritis", category: "Musculoskeletal" },
+      { name: "Rheumatoid Arthritis", category: "Musculoskeletal" },
+      { name: "Back Pain", category: "Musculoskeletal" },
+      { name: "Hypothyroidism", category: "Endocrine" },
+      { name: "Hyperthyroidism", category: "Endocrine" },
+      { name: "Anemia", category: "Hematologic" },
+      { name: "Iron Deficiency Anemia", category: "Hematologic" },
+      { name: "Allergic Rhinitis", category: "Allergic" },
+      { name: "Dermatitis", category: "Dermatologic" },
+      { name: "Eczema", category: "Dermatologic" },
+      { name: "Psoriasis", category: "Dermatologic" },
+      { name: "Coronary Artery Disease", category: "Cardiovascular" },
+      { name: "Heart Failure", category: "Cardiovascular" },
+      { name: "Atrial Fibrillation", category: "Cardiovascular" },
+      { name: "Hyperlipidemia", category: "Cardiovascular" },
+      { name: "Obesity", category: "Metabolic" },
+      { name: "Flu (Influenza)", category: "Infectious" },
+      { name: "Common Cold", category: "Infectious" },
+      { name: "Fever", category: "General" },
+      { name: "Sinusitis", category: "Respiratory" },
+      { name: "Tonsillitis", category: "Respiratory" },
+      { name: "Pharyngitis", category: "Respiratory" }
+    ];
+
+    // Autocomplete functionality
+    let selectedSuggestionIndex = -1;
+    let currentSuggestions = [];
+    let currentField = null;
+
+    function showSuggestions(fieldId, suggestions) {
+      const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+      if (!suggestionsDiv) return;
+
+      if (suggestions.length === 0) {
+        suggestionsDiv.classList.remove('show');
+        return;
+      }
+
+      currentSuggestions = suggestions;
+      selectedSuggestionIndex = -1;
+
+      suggestionsDiv.innerHTML = suggestions.map((item, index) => `
+        <div class="autocomplete-suggestion" data-index="${index}" onclick="selectSuggestion('${fieldId}', ${index})">
+          <div>${highlightMatch(item.name, document.getElementById(fieldId).value)}</div>
+          <div class="autocomplete-category">${item.category}</div>
+        </div>
+      `).join('');
+
+      suggestionsDiv.classList.add('show');
+    }
+
+    function highlightMatch(text, query) {
+      if (!query) return text;
+      const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+      return text.replace(regex, '<span class="autocomplete-match">$1</span>');
+    }
+
+    function escapeRegex(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function selectSuggestion(fieldId, index) {
+      const field = document.getElementById(fieldId);
+      const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+      
+      if (index >= 0 && index < currentSuggestions.length) {
+        field.value = currentSuggestions[index].name;
+        suggestionsDiv.classList.remove('show');
+        field.focus();
+      }
+    }
+
+    function handleAutocomplete(fieldId, dataList) {
+      const field = document.getElementById(fieldId);
+      if (!field) return;
+
+      field.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        
+        if (query.length < 2) {
+          const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+          if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+          return;
+        }
+
+        const matches = dataList.filter(item => 
+          item.name.toLowerCase().includes(query)
+        ).slice(0, 8);
+
+        showSuggestions(fieldId, matches);
+      });
+
+      field.addEventListener('keydown', function(e) {
+        const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+        if (!suggestionsDiv || !suggestionsDiv.classList.contains('show')) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, currentSuggestions.length - 1);
+          updateSelectedSuggestion(fieldId);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1);
+          updateSelectedSuggestion(fieldId);
+        } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+          e.preventDefault();
+          selectSuggestion(fieldId, selectedSuggestionIndex);
+        } else if (e.key === 'Escape') {
+          suggestionsDiv.classList.remove('show');
+        }
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.autocomplete-container')) {
+          const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+          if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+        }
+      });
+    }
+
+    function updateSelectedSuggestion(fieldId) {
+      const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+      const suggestions = suggestionsDiv.querySelectorAll('.autocomplete-suggestion');
+      
+      suggestions.forEach((suggestion, index) => {
+        if (index === selectedSuggestionIndex) {
+          suggestion.classList.add('selected');
+          suggestion.scrollIntoView({ block: 'nearest' });
+        } else {
+          suggestion.classList.remove('selected');
+        }
+      });
+    }
+    
     window.addEventListener('load', () => {
-      // Setup activity listeners
       setupActivityListeners();
       
       let savedUser;
@@ -1272,10 +1532,7 @@
         document.getElementById('main-app').style.display = 'block';
         document.getElementById('user-info').textContent = `Logged in as: ${savedUser}`;
         
-        // Initialize voice recognition
         initVoiceRecognition();
-        
-        // Start inactivity timer
         resetInactivityTimer();
         
         updateSyncStatus('offline', 'Checking connection...');
