@@ -13,13 +13,18 @@ mirror_to_github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
 
   script:
-    - git config --global user.email "abhinav2231989@gmail.com"
-    - git config --global user.name "GitLab Mirror For MedVault"
+    - git config --global user.email "Abhinav2231989@gmail.com"
+    - git config --global user.name "GitLab Mirror Medvault"
 
-    - git remote add github git@github.com:Abhinav2231989/MedicalVault.git || true
+    # checkout correct branch
+    - git checkout main
 
-    - git push github --all
-    - git push github --tags
+    # add github remote
+    - git remote remove github || true
+    - git remote add github git@github.com:Abhinav2231989/MedicalVault.git
+
+    # push latest main branch
+    - git push github main --force
 
   only:
     - main
