@@ -531,11 +531,12 @@
 
     <!-- Search Bar and Add Button -->
     <div class="search-section">
-      <div class="search-box">
-        <input type="text" id="search-input" placeholder="Search by exact patient name or patient ID...">
+      <div class="search-box" style="gap: 0.5rem;">
+        <input type="text" id="search-input" placeholder="Search by name, ID, or phone (partial match supported)..." style="flex: 1; min-width: 200px; margin-right: 0.5rem;">
         <button class="btn btn-primary btn-small" onclick="searchRecords()">Search</button>
         <button class="btn btn-secondary btn-small" onclick="clearSearch()">Show All</button>
-        <button class="btn btn-primary btn-small" onclick="showAddForm()">+ Add Patient Record</button>
+        <div style="flex: 1;"></div>
+        <button class="btn btn-primary btn-small" onclick="showAddForm()" style="white-space: nowrap;">+ Add Patient Record</button>
       </div>
     </div>
 
@@ -544,17 +545,18 @@
       <table id="records-table">
         <thead>
           <tr>
-            <th>Patient Name</th>
-            <th>Patient ID</th>
-            <th>Date of Visit</th>
-            <th>Diagnosis</th>
-            <th>Medicines</th>
-            <th>Actions</th>
+            <th style="width: 60px;"></th>
+            <th>PATIENT NAME</th>
+            <th>PHONE NUMBER</th>
+            <th>DATE OF VISIT</th>
+            <th>DIAGNOSIS</th>
+            <th>MEDICINE</th>
+            <th style="width: 80px;">ACTIONS</th>
           </tr>
         </thead>
         <tbody id="records-body">
           <tr>
-            <td colspan="6" class="empty-state">No records found</td>
+            <td colspan="7" class="empty-state">No records found</td>
           </tr>
         </tbody>
       </table>
@@ -577,6 +579,11 @@
             <button type="button" class="voice-btn" onclick="startVoiceInput('patient-name')" title="Voice input">🎤</button>
           </div>
           <datalist id="patient-names-list"></datalist>
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number <span style="color: var(--secondary);">*</span></label>
+          <input type="tel" id="phone-number" placeholder="e.g., 9876543210" required pattern="[0-9]{10}" maxlength="10">
         </div>
 
         <div class="form-group">
@@ -851,9 +858,49 @@
     }, 300000);
 
     const CORRECT_PIN = '258411';
+    const AUTO_LOGOUT_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
     let currentUser = null;
     let searchActive = false;
     let editingRecordId = null;
+    let inactivityTimer = null;
+    let lastActivityTime = Date.now();
+
+    // Auto-logout functionality
+    function resetInactivityTimer() {
+      lastActivityTime = Date.now();
+      
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      
+      if (currentUser) {
+        inactivityTimer = setTimeout(() => {
+          autoLogout();
+        }, AUTO_LOGOUT_TIME);
+      }
+    }
+
+    function autoLogout() {
+      if (currentUser) {
+        showWarningMessage('⚠ Session expired due to inactivity. Please login again.');
+        setTimeout(() => {
+          logout(true); // true = auto logout
+        }, 2000);
+      }
+    }
+
+    function setupActivityListeners() {
+      // Track user activity
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      
+      events.forEach(event => {
+        document.addEventListener(event, () => {
+          if (currentUser) {
+            resetInactivityTimer();
+          }
+        }, true);
+      });
+    }
 
     async function getOrCreatePatientId(patientName) {
       const patientMap = await loadData('patient-id-map');
@@ -915,24 +962,67 @@
       loadRecords();
       updatePatientNameSuggestions();
       
+      // Start inactivity timer
+      resetInactivityTimer();
+      
       if (GoogleDriveSync.isSignedIn()) {
         GoogleDriveSync.downloadData();
       }
     }
 
-    function logout() {
-      if (confirm('Are you sure you want to logout?')) {
-        currentUser = null;
-        if (typeof AndroidStorage !== 'undefined') {
-          AndroidStorage.removeItem('medvault_user');
-        } else {
-          localStorage.removeItem('medvault_user');
-        }
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('main-app').style.display = 'none';
-        document.getElementById('login-name').value = '';
-        document.getElementById('login-pin').value = '';
+    function logout(isAutoLogout = false) {
+      if (isAutoLogout) {
+        // Auto-logout - no confirmation needed
+        performLogout();
+      } else {
+        // Manual logout - show custom confirmation
+        showLogoutConfirmation();
       }
+    }
+
+    function showLogoutConfirmation() {
+      // Show warning message with confirmation
+      const confirmMsg = document.getElementById('warning-message');
+      confirmMsg.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Are you sure you want to logout?</span>
+          <div>
+            <button class="btn btn-secondary btn-small" onclick="cancelLogout()" style="margin-right: 0.5rem;">Cancel</button>
+            <button class="btn btn-primary btn-small" onclick="confirmLogout()">Logout</button>
+          </div>
+        </div>
+      `;
+      confirmMsg.classList.add('show');
+    }
+
+    function cancelLogout() {
+      const confirmMsg = document.getElementById('warning-message');
+      confirmMsg.classList.remove('show');
+    }
+
+    function confirmLogout() {
+      const confirmMsg = document.getElementById('warning-message');
+      confirmMsg.classList.remove('show');
+      performLogout();
+    }
+
+    function performLogout() {
+      // Clear inactivity timer
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+      }
+      
+      currentUser = null;
+      if (typeof AndroidStorage !== 'undefined') {
+        AndroidStorage.removeItem('medvault_user');
+      } else {
+        localStorage.removeItem('medvault_user');
+      }
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('main-app').style.display = 'none';
+      document.getElementById('login-name').value = '';
+      document.getElementById('login-pin').value = '';
     }
 
     function showLoginError(message) {
@@ -976,6 +1066,7 @@
       editingRecordId = recordId;
       document.getElementById('modal-title').textContent = 'Edit Patient Record';
       document.getElementById('patient-name').value = record.patientName;
+      document.getElementById('phone-number').value = record.phoneNumber || '';
       document.getElementById('date-of-visit').value = record.dateOfVisit;
       document.getElementById('diagnosis').value = record.diagnosis;
       document.getElementById('medicines').value = record.medicines;
@@ -999,7 +1090,7 @@
     function searchRecords() {
       const searchTerm = document.getElementById('search-input').value.trim();
       if (!searchTerm) {
-        alert('Please enter a patient name or ID to search');
+        alert('Please enter a patient name, ID, or phone number to search');
         return;
       }
       console.log('Searching for:', searchTerm);
@@ -1042,11 +1133,12 @@
     async function savePatientRecord(event) {
       event.preventDefault();
       const patientName = document.getElementById('patient-name').value.trim();
+      const phoneNumber = document.getElementById('phone-number').value.trim();
       const dateOfVisit = document.getElementById('date-of-visit').value;
       const diagnosis = document.getElementById('diagnosis').value.trim();
       const medicines = document.getElementById('medicines').value.trim();
 
-      if (!patientName || !dateOfVisit || !diagnosis || !medicines) {
+      if (!patientName || !phoneNumber || !dateOfVisit || !diagnosis || !medicines) {
         alert('Please fill in all required fields');
         return;
       }
@@ -1056,6 +1148,7 @@
         id: editingRecordId || Date.now(),
         patientName,
         patientId,
+        phoneNumber,
         dateOfVisit,
         diagnosis,
         medicines,
@@ -1102,7 +1195,9 @@
       let records;
       if (searchActive && searchTerm) {
         records = allRecords.filter(r => 
-          r.patientName === searchTerm || r.patientId === searchTerm
+          r.patientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          r.patientId.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          (r.phoneNumber && r.phoneNumber.includes(searchTerm))
         );
         console.log('Filtered by search term:', searchTerm, 'Found:', records);
       } else if (!searchActive) {
@@ -1116,7 +1211,7 @@
       if (records.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6" class="empty-state">
+            <td colspan="7" class="empty-state">
               ${searchActive ? 'No matching records found for "' + searchTerm + '"' : 'No records in the last 15 days. Click "Show All" or use search to see older records.'}
             </td>
           </tr>
@@ -1128,15 +1223,18 @@
       
       tbody.innerHTML = records.map(record => `
         <tr>
+          <td style="text-align: center;">
+            <span style="font-size: 1.5rem;">📋</span>
+          </td>
           <td>${record.patientName}</td>
-          <td>${record.patientId}</td>
+          <td>${record.phoneNumber || 'N/A'}</td>
           <td>${new Date(record.dateOfVisit).toLocaleDateString()}</td>
           <td>${record.diagnosis}</td>
           <td>${record.medicines}</td>
           <td>
             <div class="actions-cell">
-              <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})">Edit</button>
-              <button class="btn btn-secondary btn-small" onclick="deleteRecord(${record.id})">Delete</button>
+              <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})" title="Edit record">✏️</button>
+              <button class="btn btn-secondary btn-small" onclick="deleteRecord(${record.id})" title="Delete record">🗑️</button>
             </div>
           </td>
         </tr>
@@ -1158,6 +1256,9 @@
     }
 
     window.addEventListener('load', () => {
+      // Setup activity listeners
+      setupActivityListeners();
+      
       let savedUser;
       if (typeof AndroidStorage !== 'undefined') {
         savedUser = AndroidStorage.getItem('medvault_user');
@@ -1173,6 +1274,9 @@
         
         // Initialize voice recognition
         initVoiceRecognition();
+        
+        // Start inactivity timer
+        resetInactivityTimer();
         
         updateSyncStatus('offline', 'Checking connection...');
         loadRecords();
