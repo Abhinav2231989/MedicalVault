@@ -18,7 +18,8 @@ mirror_to_github:
 
     - git remote add github git@github.com:Abhinav2231989/MedicalVault.git || true
 
-    - git push --mirror github
+    - git push github --all
+    - git push github --tags
 
   only:
     - main
