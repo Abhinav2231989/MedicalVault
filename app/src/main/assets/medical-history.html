@@ -620,7 +620,7 @@
     <!-- Search Bar and Add Button -->
     <div class="search-section">
         <div class="search-box" style="gap: 0.5rem;">
-            <input type="text" id="search-input" placeholder="Search by name, ID, or phone (partial match supported)..." style="flex: 1; min-width: 200px; margin-right: 0.5rem;">
+            <input type="text" id="search-input" placeholder="Search by Name or Phone or Disease (partial match supported)..." style="flex: 1; min-width: 200px; margin-right: 0.5rem;">
             <button class="btn btn-primary btn-small" onclick="searchRecords()">Search</button>
             <button class="btn btn-secondary btn-small" onclick="clearSearch()">Show All</button>
             <div style="flex: 1;"></div>
@@ -1379,7 +1379,7 @@
     function searchRecords() {
       const searchTerm = document.getElementById('search-input').value.trim();
       if (!searchTerm) {
-        alert('Please enter a patient name, ID, or phone number to search');
+        alert('Please enter PatientName/PhoneNumber/DiseaseName to search');
         return;
       }
       searchActive = true;
@@ -1490,10 +1490,12 @@
 
       let records;
       if (searchActive && searchTerm) {
+        const normalizedSearch = searchTerm.toLowerCase();
         records = allRecords.filter(r =>
-          r.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.patientId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (r.phoneNumber && r.phoneNumber.includes(searchTerm))
+          (r.patientName && r.patientName.toLowerCase().includes(normalizedSearch)) ||
+          (r.patientId && r.patientId.toLowerCase().includes(normalizedSearch)) ||
+          (r.phoneNumber && r.phoneNumber.includes(searchTerm)) ||
+          (r.diagnosis && r.diagnosis.toLowerCase().includes(normalizedSearch))
         );
         notice.style.display = 'none';
       } else if (showAllActive) {
