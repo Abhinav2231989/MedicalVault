@@ -27,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
 class MainActivity : AppCompatActivity() {
@@ -263,11 +264,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val data = downloadFromGoogleDrive()
                     withContext(Dispatchers.Main) {
-                        if (data != null) {
-                            notifyDataReceived(data)
-                        } else {
-                            notifySyncComplete(false, "No data found")
-                        }
+                        notifyDataReceived(data)
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -337,20 +334,26 @@ class MainActivity : AppCompatActivity() {
         val folderId = getOrCreateFolder(service)
         val existingFileId = findFile(service, folderId, DATA_FILE)
 
-        val fileMetadata = File().apply {
-            name = DATA_FILE
-            parents = listOf(folderId)
-        }
-
         val content = com.google.api.client.http.ByteArrayContent(
             "application/json",
             dataJson.toByteArray()
         )
 
         if (existingFileId != null) {
-            service.files().update(existingFileId, fileMetadata, content).execute()
+            val updateMetadata = File().apply {
+                name = DATA_FILE
+                mimeType = "application/json"
+            }
+            service.files().update(existingFileId, updateMetadata, content)
+                .setFields("id")
+                .execute()
         } else {
-            service.files().create(fileMetadata, content)
+            val createMetadata = File().apply {
+                name = DATA_FILE
+                mimeType = "application/json"
+                parents = listOf(folderId)
+            }
+            service.files().create(createMetadata, content)
                 .setFields("id")
                 .execute()
         }
@@ -407,17 +410,16 @@ class MainActivity : AppCompatActivity() {
     private fun notifySyncComplete(success: Boolean, message: String) {
         runOnUiThread {
             webView.evaluateJavascript(
-                "if(typeof onSyncComplete === 'function') onSyncComplete($success, '${message.replace("'", "\\'")}');",
+                "if(typeof onSyncComplete === 'function') onSyncComplete($success, ${JSONObject.quote(message)});",
                 null
             )
         }
     }
 
-    private fun notifyDataReceived(data: String) {
+    private fun notifyDataReceived(data: String?) {
         runOnUiThread {
-            val escapedData = data.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
             webView.evaluateJavascript(
-                "if(typeof onDataReceived === 'function') onDataReceived('$escapedData');",
+                "if(typeof onDataReceived === 'function') onDataReceived(${JSONObject.quote(data)});",
                 null
             )
         }

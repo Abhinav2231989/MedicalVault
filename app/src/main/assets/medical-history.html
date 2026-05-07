@@ -775,6 +775,66 @@
 
     window.storage = storage;
 
+    var _syncRetryCount = 0;
+    var _uploadInProgress = false;
+    var _LOCK_TTL = 30000; // 30 seconds — covers worst-case upload duration
+
+    // Stable device ID so each phone can identify itself in the lock field
+    function _getDeviceId() {
+      var id;
+      if (typeof AndroidStorage !== 'undefined') {
+        id = AndroidStorage.getItem('medvault_device_id');
+      } else {
+        id = localStorage.getItem('medvault_device_id');
+      }
+      if (!id) {
+        id = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        if (typeof AndroidStorage !== 'undefined') {
+          AndroidStorage.setItem('medvault_device_id', id);
+        } else {
+          localStorage.setItem('medvault_device_id', id);
+        }
+      }
+      return id;
+    }
+    var _deviceId = _getDeviceId();
+
+    function _recordKey(id) {
+      return String(id);
+    }
+
+    function _timeValue(value) {
+      var time = new Date(value || 0).getTime();
+      return isNaN(time) ? 0 : time;
+    }
+
+    function _latestDeletionMap(deletedRecords) {
+      var map = {};
+      (deletedRecords || []).forEach(function(deletion) {
+        if (!deletion || deletion.id === undefined || deletion.id === null) return;
+        var key = _recordKey(deletion.id);
+        if (!map[key] || _timeValue(deletion.deletedAt) > _timeValue(map[key].deletedAt)) {
+          map[key] = {
+            id: key,
+            deletedAt: deletion.deletedAt || new Date().toISOString()
+          };
+        }
+      });
+      return map;
+    }
+
+    function _isDeletedAfterRecord(deletionMap, record) {
+      if (!record || record.id === undefined || record.id === null) return false;
+      var deletion = deletionMap[_recordKey(record.id)];
+      return !!deletion && _timeValue(deletion.deletedAt) >= _timeValue(record.timestamp);
+    }
+
+    function _compactDeletedRecords(deletionMap) {
+      return Object.keys(deletionMap).map(function(key) {
+        return deletionMap[key];
+      });
+    }
+
     // Voice Recognition Setup
     let recognition = null;
     let currentVoiceField = null;
@@ -864,13 +924,25 @@
       },
 
       uploadData: async function() {
+        if (_uploadInProgress) {
+          console.log('Upload already in progress, skipping duplicate call');
+          return;
+        }
+        _uploadInProgress = true;
         const raw = await loadData('patient-records');
+        const deletedRecords = await loadData('patient-deleted-records');
+        const deletionMap = _latestDeletionMap(deletedRecords);
         // Always strip legacy reports field — prevents OOM crash on old records
-        const records = raw.map(function(r) { const c = Object.assign({}, r); delete c.reports; return c; });
+        const records = raw
+          .filter(function(r) { return !_isDeletedAfterRecord(deletionMap, r); })
+          .map(function(r) { const c = Object.assign({}, r); delete c.reports; return c; });
         const allData = {
           records: records,
+          deletedRecords: _compactDeletedRecords(deletionMap),
           patientMap: await loadData('patient-id-map'),
-          lastSync: new Date().toISOString()
+          lastSync: new Date().toISOString(),
+          // Distributed lock — held for _LOCK_TTL ms so other devices wait
+          syncLock: { holder: _deviceId, acquiredAt: Date.now() }
         };
 
         const dataJson = JSON.stringify(allData);
@@ -880,11 +952,12 @@
           if (window._uploadTimeoutTimer) clearTimeout(window._uploadTimeoutTimer);
           window._uploadTimeoutTimer = setTimeout(function() {
             window._uploadTimeoutTimer = null;
-            updateSyncStatus('offline', 'Upload timed out - try again');
-            showWarningMessage('Upload timed out. Check connection and try Sync Now again.');
-          }, 45000);
+            _uploadInProgress = false;
+            handleSyncFailure('timeout');
+          }, 90000);
           GoogleDrive.syncToCloud(dataJson);
         } else {
+          _uploadInProgress = false;
           showWarningMessage('Running in web mode - data saved locally only');
         }
       },
@@ -912,33 +985,91 @@
         clearTimeout(window._uploadTimeoutTimer);
         window._uploadTimeoutTimer = null;
       }
+      _uploadInProgress = false;
       if (success) {
+        _syncRetryCount = 0;
         updateSyncStatus('synced', 'Last synced: ' + new Date().toLocaleTimeString());
         showSuccessMessage('✓ Synced to Google Drive');
       } else {
-        updateSyncStatus('offline', 'Sync failed');
-        showWarningMessage('⚠ ' + (message || 'Sync failed'));
+        handleSyncFailure(message);
       }
     };
 
-    // Called by Android after syncFromCloud completes — merge remote data then upload
-    // local changes back so Drive always has the latest version.
+    // Retry the full sync (download→upload) on failure so Android re-caches the
+    // Drive file ID before the next upload attempt. Resets after 3 failures.
+    function handleSyncFailure(reason) {
+      if (_syncRetryCount < 3) {
+        _syncRetryCount++;
+        updateSyncStatus('syncing', 'Retrying sync (' + _syncRetryCount + '/3)...');
+        setTimeout(manualSync, 8000);
+      } else {
+        _syncRetryCount = 0;
+        updateSyncStatus('offline', 'Sync failed');
+        showWarningMessage('Sync failed after retries. Check connection and try Sync Now.');
+      }
+    }
+
+    // Called by Android after syncFromCloud completes — check distributed lock,
+    // merge remote data, then upload so Drive always has the latest version.
+    // Android has now cached the file ID, so syncToCloud will UPDATE (not create).
     window.onDataReceived = function(dataJson) {
       if (window._syncFallbackTimer) {
         clearTimeout(window._syncFallbackTimer);
         window._syncFallbackTimer = null;
       }
+      // No file in Drive yet — upload local data to create it
+      if (!dataJson || dataJson === 'null' || dataJson.trim() === '') {
+        updateSyncStatus('syncing', 'Uploading to Google Drive...');
+        GoogleDriveSync.uploadData();
+        return;
+      }
       try {
         const data = JSON.parse(dataJson);
-        mergeData(data).then(() => {
+
+        // --- Distributed lock check ---
+        // If another device holds the lock and the TTL hasn't expired, wait.
+        // The lock is stored inside patient-records.json so no extra Drive file needed.
+        var lock = data.syncLock;
+        if (lock && lock.holder && lock.holder !== _deviceId) {
+          var lockAge = Date.now() - lock.acquiredAt;
+          if (lockAge < _LOCK_TTL) {
+            var waitMs = (_LOCK_TTL - lockAge) + 2000; // wait for lock to expire + 2s buffer
+            updateSyncStatus('syncing', 'Waiting for other device to finish sync...');
+            // Re-download after the wait to get fresh data (and a potentially released lock)
+            setTimeout(function() {
+              if (typeof GoogleDrive !== 'undefined') {
+                GoogleDrive.syncFromCloud();
+                if (window._syncFallbackTimer) clearTimeout(window._syncFallbackTimer);
+                window._syncFallbackTimer = setTimeout(function() {
+                  window._syncFallbackTimer = null;
+                  GoogleDriveSync.uploadData();
+                }, 45000);
+              }
+            }, waitMs);
+            return;
+          }
+          // Lock is stale — previous device crashed or timed out, proceed
+          console.log('Stale lock from ' + lock.holder + ', proceeding');
+        }
+        // --- End lock check ---
+
+        mergeData(data).then(function() {
           loadRecords();
+          // Cancel any in-flight fallback upload — this post-merge upload must win.
+          // The fallback may have set _uploadInProgress=true before onDataReceived fired;
+          // resetting it here ensures the correctly merged data is what gets uploaded.
+          if (window._uploadTimeoutTimer) { clearTimeout(window._uploadTimeoutTimer); window._uploadTimeoutTimer = null; }
+          _uploadInProgress = false;
           updateSyncStatus('syncing', 'Uploading to Google Drive...');
-          // Android now has the file ID from the download — upload will succeed
+          GoogleDriveSync.uploadData();
+        }).catch(function(e) {
+          console.error('Merge error:', e);
+          _uploadInProgress = false;
           GoogleDriveSync.uploadData();
         });
       } catch (e) {
         console.error('Error processing remote data:', e);
-        showWarningMessage('⚠ Error syncing data');
+        showWarningMessage('⚠ Error reading Drive data');
         updateSyncStatus('offline', 'Sync failed');
       }
     };
@@ -946,10 +1077,24 @@
     async function mergeData(remoteData) {
       const localRecords = await loadData('patient-records');
       const remoteRecords = remoteData.records || [];
-      const mergedRecords = [...localRecords];
+      const localDeletedRecords = await loadData('patient-deleted-records');
+      const remoteDeletedRecords = remoteData.deletedRecords || [];
+      const deletionMap = _latestDeletionMap(localDeletedRecords.concat(remoteDeletedRecords));
+      const mergedRecords = localRecords.filter(function(localRecord) {
+        return !_isDeletedAfterRecord(deletionMap, localRecord);
+      });
 
-      remoteRecords.forEach(remoteRecord => {
-        const existingIndex = mergedRecords.findIndex(r => String(r.id) === String(remoteRecord.id));
+      remoteRecords.forEach(function(remoteRecord) {
+        if (_isDeletedAfterRecord(deletionMap, remoteRecord)) {
+          return;
+        }
+        var existingIndex = -1;
+        for (var i = 0; i < mergedRecords.length; i++) {
+          if (String(mergedRecords[i].id) === String(remoteRecord.id)) {
+            existingIndex = i;
+            break;
+          }
+        }
         if (existingIndex === -1) {
           mergedRecords.push(remoteRecord);
         } else {
@@ -960,6 +1105,7 @@
       });
 
       await saveData('patient-records', mergedRecords);
+      await saveData('patient-deleted-records', _compactDeletedRecords(deletionMap));
 
       if (remoteData.patientMap) {
         await saveData('patient-id-map', remoteData.patientMap);
@@ -975,16 +1121,17 @@
 
     // triggerSync: download first so Android caches the Drive file ID,
     // then onDataReceived chains the upload. Falls back to direct upload
-    // after 20s if the download callback never fires (offline/error).
+    // after 45s if the download callback never fires (offline/error).
     function triggerSync() {
       if (!GoogleDriveSync.isSignedIn()) return;
       updateSyncStatus('syncing', 'Syncing with Google Drive...');
       GoogleDriveSync.downloadData();
+      if (window._syncFallbackTimer) clearTimeout(window._syncFallbackTimer);
       // Fallback in case onDataReceived is never called (no network, etc.)
-      window._syncFallbackTimer = setTimeout(() => {
+      window._syncFallbackTimer = setTimeout(function() {
         window._syncFallbackTimer = null;
         GoogleDriveSync.uploadData();
-      }, 20000);
+      }, 45000);
     }
 
     async function manualSync() {
@@ -993,16 +1140,19 @@
         showWarningMessage('Google Drive not available in web version');
         return;
       }
-      updateSyncStatus('syncing', 'Syncing with Google Drive...');
+      // Reset retry counter on explicit user tap (but not on programmatic retries)
+      if (_syncRetryCount === 0) {
+        updateSyncStatus('syncing', 'Syncing with Google Drive...');
+      }
       GoogleDrive.syncFromCloud();
       if (window._syncFallbackTimer) clearTimeout(window._syncFallbackTimer);
-      window._syncFallbackTimer = setTimeout(() => {
+      window._syncFallbackTimer = setTimeout(function() {
         window._syncFallbackTimer = null;
         GoogleDriveSync.uploadData();
-      }, 20000);
+      }, 45000);
     }
 
-    setInterval(() => {
+    setInterval(function() {
       if (GoogleDriveSync.isSignedIn()) {
         triggerSync();
       }
@@ -1264,8 +1414,18 @@
 
     async function deleteData(key, id) {
       const data = await loadData(key);
-      const filtered = data.filter(item => item.id !== id);
+      const deletedItem = data.find(item => String(item.id) === String(id));
+      const filtered = data.filter(item => String(item.id) !== String(id));
       await saveData(key, filtered);
+      if (key === 'patient-records' && deletedItem) {
+        const deletedRecords = await loadData('patient-deleted-records');
+        const deletionMap = _latestDeletionMap(deletedRecords);
+        deletionMap[_recordKey(id)] = {
+          id: _recordKey(id),
+          deletedAt: new Date().toISOString()
+        };
+        await saveData('patient-deleted-records', _compactDeletedRecords(deletionMap));
+      }
     }
 
     async function savePatientRecord(event) {
