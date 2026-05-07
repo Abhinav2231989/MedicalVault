@@ -563,8 +563,6 @@
         }
     </style>
 
-    <!-- Reports and Status Features CSS -->
-    <link rel="stylesheet" href="reports-status.css">
 </head>
 <body>
 <!-- Login Screen -->
@@ -630,6 +628,11 @@
         </div>
     </div>
 
+    <!-- Show All Notice -->
+    <div id="show-all-notice" style="display:none; background:rgba(0,168,168,0.08); border:1px solid var(--primary); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.8rem; color:var(--text-dim);">
+        ℹ️ Showing last 100 records. To view older records, please use the search functionality.
+    </div>
+
     <!-- Patient Records Table -->
     <div style="overflow-x: auto;">
         <table id="records-table">
@@ -639,12 +642,13 @@
                 <th>PATIENT NAME</th>
                 <th>PHONE NUMBER</th>
                 <th>DATE OF VISIT</th>
+                <th>STATUS</th>
                 <th style="width: 100px;">ACTIONS</th>
             </tr>
             </thead>
             <tbody id="records-body">
             <tr>
-                <td colspan="5" class="empty-state">No records found</td>
+                <td colspan="6" class="empty-state">No records found</td>
             </tr>
             </tbody>
         </table>
@@ -698,17 +702,6 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>Reports <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
-                <div class="file-upload-container">
-                    <input type="file" id="reports-input" multiple accept="image/*,.pdf,.doc,.docx" style="display: none;">
-                    <button type="button" class="file-upload-btn" onclick="document.getElementById('reports-input').click()">
-                        📎 Add Reports
-                    </button>
-                    <div id="file-list" class="file-list"></div>
-                </div>
-            </div>
-
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                 <button type="submit" class="btn btn-primary" style="flex: 1;">Save Record</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">Cancel</button>
@@ -732,29 +725,17 @@
     </div>
 </div>
 
-<!-- Reports and Status Features JavaScript - MUST LOAD FIRST THIS. -->
-<script src="reports-status.js"></script>
-
 <script>
-    // Wait for reports-status.js to load before defining other functions
-    window.addEventListener('DOMContentLoaded', function() {
-      // Check if external functions are loaded
-      if (typeof clearSelectedFiles === 'undefined') {
-        console.error('reports-status.js did not load properly!');
-        alert('Error: External scripts not loaded. Please ensure reports-status.js is in the same folder.');
-      }
-    });
-
     // Storage adapters
     const storage = {
-      async set(key, value) {
+      set: async function(key, value) {
         try {
           if (typeof AndroidStorage !== 'undefined') {
             AndroidStorage.setItem(key, value);
-            return { key, value };
+            return { key: key, value: value };
           } else {
             localStorage.setItem(key, value);
-            return { key, value };
+            return { key: key, value: value };
           }
         } catch (e) {
           console.error('Storage set error:', e);
@@ -762,29 +743,29 @@
         }
       },
 
-      async get(key) {
+      get: async function(key) {
         try {
-          let value;
+          var value;
           if (typeof AndroidStorage !== 'undefined') {
             value = AndroidStorage.getItem(key);
           } else {
             value = localStorage.getItem(key);
           }
-          return value ? { key, value } : null;
+          return value ? { key: key, value: value } : null;
         } catch (e) {
           console.error('Storage get error:', e);
           return null;
         }
       },
 
-      async delete(key) {
+      delete: async function(key) {
         try {
           if (typeof AndroidStorage !== 'undefined') {
             AndroidStorage.removeItem(key);
           } else {
             localStorage.removeItem(key);
           }
-          return { key, deleted: true };
+          return { key: key, deleted: true };
         } catch (e) {
           console.error('Storage delete error:', e);
           throw e;
@@ -867,14 +848,14 @@
 
     // Google Drive interface
     const GoogleDriveSync = {
-      isSignedIn() {
+      isSignedIn: function() {
         if (typeof GoogleDrive !== 'undefined') {
           return GoogleDrive.isSignedIn();
         }
         return false;
       },
 
-      signIn() {
+      signIn: function() {
         if (typeof GoogleDrive !== 'undefined') {
           GoogleDrive.signIn();
         } else {
@@ -882,25 +863,33 @@
         }
       },
 
-      async uploadData() {
+      uploadData: async function() {
+        const raw = await loadData('patient-records');
+        // Always strip legacy reports field — prevents OOM crash on old records
+        const records = raw.map(function(r) { const c = Object.assign({}, r); delete c.reports; return c; });
         const allData = {
-          records: await loadData('patient-records'),
+          records: records,
           patientMap: await loadData('patient-id-map'),
           lastSync: new Date().toISOString()
         };
 
-        const dataJson = JSON.stringify(allData).replace(/"/g, '\\"');
+        const dataJson = JSON.stringify(allData);
 
         if (typeof GoogleDrive !== 'undefined') {
           updateSyncStatus('syncing', 'Uploading to Google Drive...');
+          if (window._uploadTimeoutTimer) clearTimeout(window._uploadTimeoutTimer);
+          window._uploadTimeoutTimer = setTimeout(function() {
+            window._uploadTimeoutTimer = null;
+            updateSyncStatus('offline', 'Upload timed out - try again');
+            showWarningMessage('Upload timed out. Check connection and try Sync Now again.');
+          }, 45000);
           GoogleDrive.syncToCloud(dataJson);
         } else {
-          console.log('Would upload:', allData);
           showWarningMessage('Running in web mode - data saved locally only');
         }
       },
 
-      async downloadData() {
+      downloadData: async function() {
         if (typeof GoogleDrive !== 'undefined') {
           updateSyncStatus('syncing', 'Downloading from Google Drive...');
           GoogleDrive.syncFromCloud();
@@ -919,25 +908,38 @@
     };
 
     window.onSyncComplete = function(success, message) {
+      if (window._uploadTimeoutTimer) {
+        clearTimeout(window._uploadTimeoutTimer);
+        window._uploadTimeoutTimer = null;
+      }
       if (success) {
-        updateSyncStatus('synced', 'Last synced: just now');
-        showSuccessMessage('✓ ' + message);
+        updateSyncStatus('synced', 'Last synced: ' + new Date().toLocaleTimeString());
+        showSuccessMessage('✓ Synced to Google Drive');
       } else {
         updateSyncStatus('offline', 'Sync failed');
-        showWarningMessage('⚠ ' + message);
+        showWarningMessage('⚠ ' + (message || 'Sync failed'));
       }
     };
 
+    // Called by Android after syncFromCloud completes — merge remote data then upload
+    // local changes back so Drive always has the latest version.
     window.onDataReceived = function(dataJson) {
+      if (window._syncFallbackTimer) {
+        clearTimeout(window._syncFallbackTimer);
+        window._syncFallbackTimer = null;
+      }
       try {
         const data = JSON.parse(dataJson);
-        mergeData(data);
-        updateSyncStatus('synced', 'Synced successfully');
-        showSuccessMessage('✓ Data synced from Google Drive');
-        loadRecords();
+        mergeData(data).then(() => {
+          loadRecords();
+          updateSyncStatus('syncing', 'Uploading to Google Drive...');
+          // Android now has the file ID from the download — upload will succeed
+          GoogleDriveSync.uploadData();
+        });
       } catch (e) {
         console.error('Error processing remote data:', e);
         showWarningMessage('⚠ Error syncing data');
+        updateSyncStatus('offline', 'Sync failed');
       }
     };
 
@@ -947,7 +949,7 @@
       const mergedRecords = [...localRecords];
 
       remoteRecords.forEach(remoteRecord => {
-        const existingIndex = mergedRecords.findIndex(r => r.id === remoteRecord.id);
+        const existingIndex = mergedRecords.findIndex(r => String(r.id) === String(remoteRecord.id));
         if (existingIndex === -1) {
           mergedRecords.push(remoteRecord);
         } else {
@@ -971,16 +973,38 @@
       syncText.textContent = text;
     }
 
-    async function manualSync() {
-      await GoogleDriveSync.downloadData();
-      setTimeout(() => {
+    // triggerSync: download first so Android caches the Drive file ID,
+    // then onDataReceived chains the upload. Falls back to direct upload
+    // after 20s if the download callback never fires (offline/error).
+    function triggerSync() {
+      if (!GoogleDriveSync.isSignedIn()) return;
+      updateSyncStatus('syncing', 'Syncing with Google Drive...');
+      GoogleDriveSync.downloadData();
+      // Fallback in case onDataReceived is never called (no network, etc.)
+      window._syncFallbackTimer = setTimeout(() => {
+        window._syncFallbackTimer = null;
         GoogleDriveSync.uploadData();
-      }, 1000);
+      }, 20000);
+    }
+
+    async function manualSync() {
+      // Always attempt on manual button tap — let Android handle auth if needed
+      if (typeof GoogleDrive === 'undefined') {
+        showWarningMessage('Google Drive not available in web version');
+        return;
+      }
+      updateSyncStatus('syncing', 'Syncing with Google Drive...');
+      GoogleDrive.syncFromCloud();
+      if (window._syncFallbackTimer) clearTimeout(window._syncFallbackTimer);
+      window._syncFallbackTimer = setTimeout(() => {
+        window._syncFallbackTimer = null;
+        GoogleDriveSync.uploadData();
+      }, 20000);
     }
 
     setInterval(() => {
       if (GoogleDriveSync.isSignedIn()) {
-        GoogleDriveSync.downloadData();
+        triggerSync();
       }
     }, 300000);
 
@@ -988,6 +1012,7 @@
     const AUTO_LOGOUT_TIME = 15 * 60 * 1000;
     let currentUser = null;
     let searchActive = false;
+    let showAllActive = false;
     let editingRecordId = null;
     let inactivityTimer = null;
     let lastActivityTime = Date.now();
@@ -1095,7 +1120,7 @@
       }
     }
 
-    function logout(isAutoLogout = false) {
+    function logout(isAutoLogout) {
       if (isAutoLogout) {
         performLogout();
       } else {
@@ -1171,22 +1196,13 @@
       editingRecordId = null;
       document.getElementById('modal-title').textContent = 'Add Patient Record';
       document.getElementById('patient-form').reset();
-      // Safe call - check if function exists
-      if (typeof clearSelectedFiles === 'function') {
-        clearSelectedFiles();
-      }
       document.getElementById('patient-modal').classList.add('show');
     }
 
     async function editRecord(recordId) {
       const records = await loadData('patient-records');
       const record = records.find(r => r.id === recordId);
-
-      if (!record) {
-        showWarningMessage('Record not found');
-        return;
-      }
-
+      if (!record) { showWarningMessage('Record not found'); return; }
       editingRecordId = recordId;
       document.getElementById('modal-title').textContent = 'Edit Patient Record';
       document.getElementById('patient-name').value = record.patientName;
@@ -1194,21 +1210,11 @@
       document.getElementById('date-of-visit').value = record.dateOfVisit;
       document.getElementById('diagnosis').value = record.diagnosis;
       document.getElementById('medicines').value = record.medicines || '';
-
-      // Safe call - check if function exists
-      if (typeof loadSelectedFiles === 'function') {
-        loadSelectedFiles(record.reports || []);
-      }
-
       document.getElementById('patient-modal').classList.add('show');
     }
 
     function closeModal() {
       document.getElementById('patient-modal').classList.remove('show');
-      // Safe call - check if function exists
-      if (typeof clearSelectedFiles === 'function') {
-        clearSelectedFiles();
-      }
       editingRecordId = null;
       stopVoiceInput();
     }
@@ -1227,11 +1233,13 @@
         return;
       }
       searchActive = true;
+      showAllActive = false;
       loadRecords();
     }
 
     function clearSearch() {
       searchActive = false;
+      showAllActive = true;
       document.getElementById('search-input').value = '';
       loadRecords();
     }
@@ -1274,25 +1282,16 @@
       }
 
       const patientId = await getOrCreatePatientId(patientName);
-
-      // Safe call - check if function exists
-      const status = (typeof calculateStatus === 'function') ? calculateStatus(medicines) : (medicines ? 'Complete' : 'In Progress');
-
-      // Safe call - check if function exists
-      let reports = [];
-      if (typeof getSelectedFiles === 'function') {
-        reports = getSelectedFiles().length > 0 ? getSelectedFiles() : (editingRecordId ? (await loadData('patient-records')).find(r => r.id === editingRecordId)?.reports || [] : []);
-      }
+      const status = medicines ? 'Complete' : 'In Progress';
 
       const record = {
         id: editingRecordId || Date.now(),
-        patientName,
-        patientId,
-        phoneNumber,
-        dateOfVisit,
-        diagnosis,
+        patientName: patientName,
+        patientId: patientId,
+        phoneNumber: phoneNumber,
+        dateOfVisit: dateOfVisit,
+        diagnosis: diagnosis,
         medicines: medicines || '',
-        reports: reports,
         status: status,
         timestamp: new Date().toISOString()
       };
@@ -1311,11 +1310,6 @@
 
       await saveData('patient-records', records);
       await updatePatientNameSuggestions();
-
-      // Safe call - check if function exists
-      if (typeof clearSelectedFiles === 'function') {
-        clearSelectedFiles();
-      }
       closeModal();
 
       if (searchActive) {
@@ -1325,13 +1319,14 @@
       }
 
       if (GoogleDriveSync.isSignedIn()) {
-        setTimeout(() => GoogleDriveSync.uploadData(), 500);
+        setTimeout(triggerSync, 1000);
       }
     }
 
     async function loadRecords() {
       const allRecords = await loadData('patient-records');
       const searchTerm = document.getElementById('search-input').value.trim();
+      const notice = document.getElementById('show-all-notice');
 
       let records;
       if (searchActive && searchTerm) {
@@ -1340,17 +1335,21 @@
           r.patientId.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (r.phoneNumber && r.phoneNumber.includes(searchTerm))
         );
-      } else if (!searchActive) {
-        records = allRecords.filter(r => isWithinLast15Days(r.dateOfVisit));
+        notice.style.display = 'none';
+      } else if (showAllActive) {
+        const sorted = [...allRecords].sort((a, b) => new Date(b.dateOfVisit) - new Date(a.dateOfVisit));
+        records = sorted.slice(0, 100);
+        notice.style.display = 'block';
       } else {
-        records = allRecords;
+        records = allRecords.filter(r => isWithinLast15Days(r.dateOfVisit));
+        notice.style.display = 'none';
       }
 
       const tbody = document.getElementById('records-body');
       if (records.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="empty-state">
+            <td colspan="6" class="empty-state">
               ${searchActive ? 'No matching records found for "' + searchTerm + '"' : 'No records in the last 15 days. Click "Show All" or use search to see older records.'}
             </td>
           </tr>
@@ -1368,6 +1367,11 @@
           <td>${record.patientName}</td>
           <td>${record.phoneNumber || 'N/A'}</td>
           <td>${new Date(record.dateOfVisit).toLocaleDateString()}</td>
+          <td>
+            <span style="padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;white-space:nowrap;background:${(record.status === 'Complete') ? 'rgba(76,175,80,0.2)' : 'rgba(255,152,0,0.2)'};color:${(record.status === 'Complete') ? 'var(--success)' : 'var(--warning)'};">
+              ${record.status || 'In Progress'}
+            </span>
+          </td>
           <td onclick="event.stopPropagation()">
             <div class="actions-cell">
               <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})" title="Edit record">✏️</button>
@@ -1382,8 +1386,6 @@
       const allRecords = await loadData('patient-records');
       const record = allRecords.find(r => r.id === id);
       if (!record) return;
-
-      window._detailReports = record.reports || [];
 
       const fields = [
         { label: 'Patient Name', value: record.patientName },
@@ -1401,39 +1403,7 @@
         </div>
       `).join('');
 
-      const reports = record.reports || [];
-      let reportsHtml;
-      if (reports.length > 0) {
-        const fileItems = reports.map((file, idx) => {
-          const sizeText = typeof formatFileSize === 'function' ? formatFileSize(file.size) : '';
-          const isImage = file.type && file.type.startsWith('image/');
-          const thumb = isImage
-            ? `<img src="${file.data}" alt="${file.name}" onclick="openDetailFilePreview(${idx})" style="width:56px;height:56px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--border);flex-shrink:0;">`
-            : `<span style="font-size:2rem;flex-shrink:0;">📄</span>`;
-          return `
-            <div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-              ${thumb}
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:0.8rem;word-break:break-all;">${file.name}</div>
-                <div style="font-size:0.7rem;color:var(--text-dim);">${sizeText}</div>
-              </div>
-              <a href="${file.data}" download="${file.name}" class="btn btn-primary btn-small" style="text-decoration:none;flex-shrink:0;">${isImage ? '⬇' : '⬇ Download'}</a>
-            </div>`;
-        }).join('');
-        reportsHtml = `
-          <div class="detail-field">
-            <span class="detail-field-label">Reports (${reports.length} file${reports.length > 1 ? 's' : ''})</span>
-            <div style="margin-top:0.5rem;">${fileItems}</div>
-          </div>`;
-      } else {
-        reportsHtml = `
-          <div class="detail-field">
-            <span class="detail-field-label">Reports</span>
-            <span class="detail-field-value" style="color:var(--text-dim);font-style:italic;">No reports</span>
-          </div>`;
-      }
-
-      document.getElementById('detail-body').innerHTML = fieldsHtml + reportsHtml;
+      document.getElementById('detail-body').innerHTML = fieldsHtml;
 
       document.getElementById('detail-edit-btn').onclick = () => {
         closeDetailModal();
@@ -1443,34 +1413,8 @@
       document.getElementById('detail-modal').classList.add('show');
     }
 
-    function openDetailFilePreview(idx) {
-      const file = window._detailReports && window._detailReports[idx];
-      if (!file) return;
-
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;';
-      overlay.onclick = () => overlay.remove();
-
-      if (file.type && file.type.startsWith('image/')) {
-        overlay.innerHTML = `
-          <img src="${file.data}" style="max-width:100%;max-height:85vh;object-fit:contain;border-radius:4px;" onclick="event.stopPropagation()">
-          <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;margin-top:0.75rem;">${file.name} &nbsp;·&nbsp; tap outside to close</div>`;
-      } else {
-        overlay.innerHTML = `
-          <div style="color:white;text-align:center;" onclick="event.stopPropagation()">
-            <div style="font-size:4rem;">📄</div>
-            <div style="margin:0.5rem 0;">${file.name}</div>
-            <a href="${file.data}" download="${file.name}" class="btn btn-primary" style="text-decoration:none;display:inline-block;margin-top:1rem;">⬇ Download</a>
-            <div style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:1rem;">tap outside to close</div>
-          </div>`;
-      }
-
-      document.body.appendChild(overlay);
-    }
-
     function closeDetailModal() {
       document.getElementById('detail-modal').classList.remove('show');
-      window._detailReports = [];
     }
 
     async function deleteRecord(id) {
@@ -1480,7 +1424,7 @@
         loadRecords();
 
         if (GoogleDriveSync.isSignedIn()) {
-          setTimeout(() => GoogleDriveSync.uploadData(), 500);
+          setTimeout(triggerSync, 1000);
         }
       }
     }
@@ -1639,6 +1583,26 @@
       });
     }
 
+    // One-time migration: remove legacy base64 report data from stored records.
+    // Old records may still have a 'reports' field with large image data that
+    // causes OOM crashes when the full JSON is loaded into memory.
+    async function migrateRemoveReports() {
+      try {
+        const records = await loadData('patient-records');
+        if (records.some(function(r) { return r.reports !== undefined; })) {
+          const cleaned = records.map(function(r) {
+            const c = Object.assign({}, r);
+            delete c.reports;
+            return c;
+          });
+          await saveData('patient-records', cleaned);
+          console.log('Migration: stripped reports from ' + records.length + ' records');
+        }
+      } catch (e) {
+        console.error('Migration error:', e);
+      }
+    }
+
     window.addEventListener('load', () => {
       setupActivityListeners();
 
@@ -1656,15 +1620,19 @@
         document.getElementById('user-info').textContent = `Logged in as: ${savedUser}`;
 
         initVoiceRecognition();
+        handleAutocomplete('diagnosis', commonDiagnoses);
         resetInactivityTimer();
 
         updateSyncStatus('offline', 'Checking connection...');
-        loadRecords();
-        updatePatientNameSuggestions();
+        // Run migration first, then load — ensures no legacy image data in memory
+        migrateRemoveReports().then(() => {
+          loadRecords();
+          updatePatientNameSuggestions();
+        });
 
         setTimeout(() => {
           if (GoogleDriveSync.isSignedIn()) {
-            GoogleDriveSync.downloadData();
+            triggerSync();
           } else {
             updateSyncStatus('offline', 'Working offline - Click to sync');
           }
