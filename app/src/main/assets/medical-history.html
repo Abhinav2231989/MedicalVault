@@ -668,7 +668,7 @@
                 <label>Patient Name <span style="color: var(--secondary);">*</span></label>
                 <div class="input-with-voice">
                     <input type="text" id="patient-name" placeholder="e.g., John Doe" required list="patient-names-list">
-                    <button type="button" class="voice-btn" onclick="startVoiceInput('patient-name')" title="Voice input">🎤</button>
+                    <button type="button" class="voice-btn" data-voice-field="patient-name" title="Hold to speak">🎤</button>
                 </div>
                 <datalist id="patient-names-list"></datalist>
             </div>
@@ -690,15 +690,18 @@
                         <textarea id="diagnosis" placeholder="Speak or type diagnosis details..." required></textarea>
                         <div id="diagnosis-suggestions" class="autocomplete-suggestions"></div>
                     </div>
-                    <button type="button" class="voice-btn" onclick="startVoiceInput('diagnosis')" title="Voice input" style="top: 20px;">🎤</button>
+                    <button type="button" class="voice-btn" data-voice-field="diagnosis" title="Hold to speak" style="top: 20px;">🎤</button>
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Medicines <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
                 <div class="input-with-voice">
-                    <textarea id="medicines" placeholder="Speak or type prescribed medicines (optional)..."></textarea>
-                    <button type="button" class="voice-btn" onclick="startVoiceInput('medicines')" title="Voice input" style="top: 20px;">🎤</button>
+                    <div class="autocomplete-container">
+                        <textarea id="medicines" placeholder="Speak or type prescribed medicines (optional)..."></textarea>
+                        <div id="medicines-suggestions" class="autocomplete-suggestions"></div>
+                    </div>
+                    <button type="button" class="voice-btn" data-voice-field="medicines" title="Hold to speak" style="top: 20px;">🎤</button>
                 </div>
             </div>
 
@@ -838,48 +841,203 @@
     // Voice Recognition Setup
     let recognition = null;
     let currentVoiceField = null;
+    let currentVoiceButton = null;
+    let isVoiceHoldActive = false;
+    let shouldRestartVoiceRecognition = false;
+
+    const voiceDiagnosisAliases = {
+      'bp': 'Hypertension',
+      'blood pressure': 'Hypertension',
+      'high bp': 'Hypertension',
+      'high blood pressure': 'Hypertension',
+      'sugar': 'Diabetes mellitus',
+      'diabetes': 'Diabetes mellitus',
+      'thyroid low': 'Hypothyroidism',
+      'thyroid high': 'Hyperthyroidism',
+      'cold': 'Common Cold',
+      'flu': 'Flu (Influenza)',
+      'urine infection': 'Urinary Tract Infection (UTI)',
+      'uti': 'Urinary Tract Infection (UTI)',
+      'acidity': 'Gastroesophageal Reflux Disease (GERD)'
+    };
+
+    const voiceMedicineAliases = {
+      'pcm': 'Paracetamol',
+      'crocin': 'Paracetamol',
+      'dolo': 'Paracetamol',
+      'amox': 'Amoxicillin',
+      'amoxiclav': 'Amoxicillin',
+      'azee': 'Azithromycin',
+      'azithro': 'Azithromycin',
+      'cetzin': 'Cetirizine',
+      'levocet': 'Levocetirizine',
+      'pan d': 'Pantoprazole',
+      'pantocid': 'Pantoprazole',
+      'metform': 'Metformin',
+      'ecosprin': 'Aspirin',
+      'atorva': 'Atorvastatin',
+      'rosuva': 'Rosuvastatin',
+      'arnica': 'Arnica montana',
+      'nux': 'Nux vomica',
+      'rhus tox': 'Rhus toxicodendron',
+      'calc carb': 'Calcarea carbonica'
+    };
 
     function initVoiceRecognition() {
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         recognition.lang = 'en-US';
 
         recognition.onresult = function(event) {
-          const transcript = event.results[0][0].transcript;
-          if (currentVoiceField) {
-            const field = document.getElementById(currentVoiceField);
-            if (field) {
-              field.value = field.value ? field.value + ' ' + transcript : transcript;
+          if (!currentVoiceField) return;
+          const field = document.getElementById(currentVoiceField);
+          if (!field) return;
+
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript + ' ';
             }
           }
-          stopVoiceInput();
+
+          if (finalTranscript.trim()) {
+            appendVoiceTranscript(field, finalTranscript.trim());
+          }
         };
 
         recognition.onerror = function(event) {
           console.error('Speech recognition error:', event.error);
-          showWarningMessage('Voice input error: ' + event.error);
+          if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            showWarningMessage('Voice input error: ' + event.error);
+          }
+          shouldRestartVoiceRecognition = false;
           stopVoiceInput();
         };
 
         recognition.onend = function() {
-          stopVoiceInput();
+          if (shouldRestartVoiceRecognition && isVoiceHoldActive && currentVoiceField) {
+            try {
+              recognition.start();
+            } catch (e) {
+              shouldRestartVoiceRecognition = false;
+              stopVoiceInput();
+            }
+          } else {
+            resetVoiceButtonState();
+          }
         };
       }
     }
 
-    function startVoiceInput(fieldId) {
+    function normalizePhoneTranscript(text) {
+      const numberWords = {
+        zero: '0', oh: '0', o: '0',
+        one: '1', two: '2', to: '2', too: '2',
+        three: '3', four: '4', for: '4',
+        five: '5', six: '6', seven: '7',
+        eight: '8', ate: '8', nine: '9',
+        ten: '10'
+      };
+      const multipliers = { double: 2, triple: 3 };
+      const parts = text
+        .toLowerCase()
+        .replace(/[-,]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean);
+      let digits = '';
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (multipliers[part] && i + 1 < parts.length) {
+          const next = numberWords[parts[i + 1]] || parts[i + 1].replace(/\D/g, '');
+          if (next) {
+            digits += next.repeat(multipliers[part]);
+            i++;
+            continue;
+          }
+        }
+        digits += numberWords[part] || part.replace(/\D/g, '');
+      }
+
+      return digits.replace(/\D/g, '').slice(0, 10);
+    }
+
+    function applyVoiceAliases(text, aliases) {
+      let cleaned = String(text || '').trim();
+      const normalized = cleaned.toLowerCase().replace(/\s+/g, ' ');
+      Object.keys(aliases).forEach(function(key) {
+        const regex = new RegExp('\\b' + escapeRegex(key) + '\\b', 'gi');
+        cleaned = cleaned.replace(regex, aliases[key]);
+      });
+      return aliases[normalized] || cleaned;
+    }
+
+    function cleanupVoiceTranscript(fieldId, transcript) {
+      if (fieldId === 'diagnosis') {
+        return applyVoiceAliases(transcript, voiceDiagnosisAliases);
+      }
+      if (fieldId === 'medicines') {
+        return applyVoiceAliases(transcript, voiceMedicineAliases);
+      }
+      return transcript;
+    }
+
+    function appendVoiceTranscript(field, transcript) {
+      if (field.id === 'phone-number') {
+        field.value = (field.value + normalizePhoneTranscript(transcript)).replace(/\D/g, '').slice(0, 10);
+      } else {
+        const cleanedTranscript = cleanupVoiceTranscript(field.id, transcript);
+        field.value = field.value ? field.value + ' ' + cleanedTranscript : cleanedTranscript;
+      }
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      handleVoicePostProcess(field.id);
+    }
+
+    function bindVoiceButtons() {
+      document.querySelectorAll('.voice-btn[data-voice-field]').forEach(function(btn) {
+        if (btn.dataset.voiceBound === 'true') return;
+        btn.dataset.voiceBound = 'true';
+
+        btn.addEventListener('pointerdown', function(e) {
+          e.preventDefault();
+          startVoiceInput(btn.dataset.voiceField, btn);
+        });
+
+        btn.addEventListener('pointerup', function(e) {
+          e.preventDefault();
+          stopVoiceInput();
+        });
+
+        btn.addEventListener('pointercancel', stopVoiceInput);
+        btn.addEventListener('pointerleave', function() {
+          if (isVoiceHoldActive && currentVoiceButton === btn) {
+            stopVoiceInput();
+          }
+        });
+
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+        });
+      });
+    }
+
+    function startVoiceInput(fieldId, voiceBtn) {
       if (!recognition) {
         showWarningMessage('Voice input not supported in this browser');
         return;
       }
 
       currentVoiceField = fieldId;
-      const voiceBtn = event.target;
-      voiceBtn.classList.add('listening');
-      voiceBtn.textContent = '🔴';
+      currentVoiceButton = voiceBtn || document.querySelector('.voice-btn[data-voice-field="' + fieldId + '"]');
+      isVoiceHoldActive = true;
+      shouldRestartVoiceRecognition = true;
+      if (currentVoiceButton) {
+        currentVoiceButton.classList.add('listening');
+        currentVoiceButton.textContent = '🔴';
+      }
 
       try {
         recognition.start();
@@ -890,6 +1048,8 @@
     }
 
     function stopVoiceInput() {
+      isVoiceHoldActive = false;
+      shouldRestartVoiceRecognition = false;
       if (recognition) {
         try {
           recognition.stop();
@@ -897,13 +1057,17 @@
           // Already stopped
         }
       }
+      resetVoiceButtonState();
+    }
 
+    function resetVoiceButtonState() {
       document.querySelectorAll('.voice-btn').forEach(btn => {
         btn.classList.remove('listening');
         btn.textContent = '🎤';
       });
 
       currentVoiceField = null;
+      currentVoiceButton = null;
     }
 
     // Google Drive interface
@@ -1247,9 +1411,11 @@
       document.getElementById('user-info').textContent = `Logged in as: ${name}`;
 
       initVoiceRecognition();
+      bindVoiceButtons();
 
-      // Initialize autocomplete - diagnosis only (medicines autocomplete removed)
+      // Initialize autocomplete for diagnosis and medicines
       handleAutocomplete('diagnosis', commonDiagnoses);
+      handleAutocomplete('medicines', commonMedicines);
 
       if (!GoogleDriveSync.isSignedIn()) {
         setTimeout(() => {
@@ -1635,10 +1801,61 @@
       { name: "Pharyngitis", category: "Respiratory" }
     ];
 
+    const commonMedicines = [
+      { name: "Paracetamol", category: "Allopathic - analgesic/antipyretic" },
+      { name: "Ibuprofen", category: "Allopathic - NSAID" },
+      { name: "Amoxicillin", category: "Allopathic - antibiotic" },
+      { name: "Azithromycin", category: "Allopathic - antibiotic" },
+      { name: "Cefixime", category: "Allopathic - antibiotic" },
+      { name: "Cetirizine", category: "Allopathic - antihistamine" },
+      { name: "Levocetirizine", category: "Allopathic - antihistamine" },
+      { name: "Montelukast", category: "Allopathic - respiratory" },
+      { name: "Salbutamol", category: "Allopathic - bronchodilator" },
+      { name: "Budesonide", category: "Allopathic - corticosteroid" },
+      { name: "Pantoprazole", category: "Allopathic - acid reducer" },
+      { name: "Omeprazole", category: "Allopathic - acid reducer" },
+      { name: "Metformin", category: "Allopathic - antidiabetic" },
+      { name: "Glimepiride", category: "Allopathic - antidiabetic" },
+      { name: "Amlodipine", category: "Allopathic - antihypertensive" },
+      { name: "Telmisartan", category: "Allopathic - antihypertensive" },
+      { name: "Losartan", category: "Allopathic - antihypertensive" },
+      { name: "Atorvastatin", category: "Allopathic - statin" },
+      { name: "Rosuvastatin", category: "Allopathic - statin" },
+      { name: "Aspirin", category: "Allopathic - antiplatelet/analgesic" },
+      { name: "Clopidogrel", category: "Allopathic - antiplatelet" },
+      { name: "Ondansetron", category: "Allopathic - antiemetic" },
+      { name: "Domperidone", category: "Allopathic - antiemetic" },
+      { name: "Doxycycline", category: "Allopathic - antibiotic" },
+      { name: "Ciprofloxacin", category: "Allopathic - antibiotic" },
+      { name: "Arnica montana", category: "Homeopathic" },
+      { name: "Nux vomica", category: "Homeopathic" },
+      { name: "Belladonna", category: "Homeopathic" },
+      { name: "Rhus toxicodendron", category: "Homeopathic" },
+      { name: "Bryonia alba", category: "Homeopathic" },
+      { name: "Pulsatilla", category: "Homeopathic" },
+      { name: "Aconitum napellus", category: "Homeopathic" },
+      { name: "Gelsemium", category: "Homeopathic" },
+      { name: "Hepar sulphuris", category: "Homeopathic" },
+      { name: "Calcarea carbonica", category: "Homeopathic" },
+      { name: "Sulphur", category: "Homeopathic" },
+      { name: "Silicea", category: "Homeopathic" },
+      { name: "Mercurius solubilis", category: "Homeopathic" },
+      { name: "Apis mellifica", category: "Homeopathic" },
+      { name: "Phosphorus", category: "Homeopathic" }
+    ];
+
     // Autocomplete functionality
     let selectedSuggestionIndex = -1;
     let currentSuggestions = [];
     let currentField = null;
+    let diagnosisSuggestTimer = null;
+    let diagnosisSuggestController = null;
+    let medicineSuggestTimer = null;
+    let medicineSuggestController = null;
+    const diagnosisSuggestionCache = {};
+    const medicineSuggestionCache = {};
+    const CONDITIONS_API_URL = 'https://clinicaltables.nlm.nih.gov/api/conditions/v3/search';
+    const RXTERMS_API_URL = 'https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search';
 
     function showSuggestions(fieldId, suggestions) {
       const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
@@ -1654,22 +1871,254 @@
 
       suggestionsDiv.innerHTML = suggestions.map((item, index) => `
         <div class="autocomplete-suggestion" data-index="${index}" onclick="selectSuggestion('${fieldId}', ${index})">
-          <div>${highlightMatch(item.name, document.getElementById(fieldId).value)}</div>
-          <div class="autocomplete-category">${item.category}</div>
+          <div>${highlightMatch(item.name, getAutocompleteQuery(fieldId))}</div>
+          <div class="autocomplete-category">${escapeHtml(item.category || '')}</div>
         </div>
       `).join('');
 
       suggestionsDiv.classList.add('show');
     }
 
+    function getAutocompleteQuery(fieldId) {
+      const field = document.getElementById(fieldId);
+      if (!field) return '';
+      if (fieldId === 'medicines') {
+        return getCurrentMedicineSegment(field).query;
+      }
+      return field.value.trim();
+    }
+
     function highlightMatch(text, query) {
-      if (!query) return text;
-      const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-      return text.replace(regex, '<span class="autocomplete-match">$1</span>');
+      const safeText = escapeHtml(text || '');
+      if (!query) return safeText;
+      const regex = new RegExp(`(${escapeRegex(escapeHtml(query))})`, 'gi');
+      return safeText.replace(regex, '<span class="autocomplete-match">$1</span>');
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, function(ch) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[ch];
+      });
     }
 
     function escapeRegex(str) {
       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function getCurrentMedicineSegment(field) {
+      const value = field.value || '';
+      const cursor = field.selectionStart || value.length;
+      const beforeCursor = value.slice(0, cursor);
+      const afterCursor = value.slice(cursor);
+      const startOffset = Math.max(
+        beforeCursor.lastIndexOf(','),
+        beforeCursor.lastIndexOf(';'),
+        beforeCursor.lastIndexOf('\n')
+      );
+      const nextSeparators = [afterCursor.indexOf(','), afterCursor.indexOf(';'), afterCursor.indexOf('\n')]
+        .filter(function(index) { return index !== -1; });
+      const endOffset = nextSeparators.length ? cursor + Math.min.apply(null, nextSeparators) : value.length;
+      const start = startOffset === -1 ? 0 : startOffset + 1;
+
+      return {
+        start: start,
+        end: endOffset,
+        query: value.slice(start, endOffset).trim()
+      };
+    }
+
+    function replaceCurrentMedicineSegment(field, replacement) {
+      const value = field.value || '';
+      const segment = getCurrentMedicineSegment(field);
+      const before = value.slice(0, segment.start);
+      const after = value.slice(segment.end);
+      const leadingSpace = before && !before.endsWith(' ') && !before.endsWith('\n') ? ' ' : '';
+      field.value = before + leadingSpace + replacement + after;
+      const cursor = (before + leadingSpace + replacement).length;
+      field.setSelectionRange(cursor, cursor);
+    }
+
+    function levenshteinDistance(a, b) {
+      a = (a || '').toLowerCase();
+      b = (b || '').toLowerCase();
+      const dp = Array.from({ length: a.length + 1 }, function(_, i) {
+        return [i];
+      });
+
+      for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+          );
+        }
+      }
+
+      return dp[a.length][b.length];
+    }
+
+    function getLocalDiagnosisSuggestions(query, dataList) {
+      const normalizedQuery = query.toLowerCase();
+      const directMatches = dataList.filter(item =>
+        item.name.toLowerCase().includes(normalizedQuery)
+      );
+
+      const fuzzyMatches = dataList
+        .filter(function(item) {
+          const words = item.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+          return words.some(function(word) {
+            const maxDistance = normalizedQuery.length <= 6 ? 1 : 2;
+            return Math.abs(word.length - normalizedQuery.length) <= maxDistance &&
+              levenshteinDistance(normalizedQuery, word) <= maxDistance;
+          });
+        })
+        .map(function(item) {
+          return {
+            name: item.name,
+            category: item.category + ' - suggested correction'
+          };
+        });
+
+      return mergeSuggestions(directMatches, fuzzyMatches).slice(0, 8);
+    }
+
+    function mergeSuggestions() {
+      const seen = {};
+      const merged = [];
+      Array.prototype.slice.call(arguments).forEach(function(list) {
+        (list || []).forEach(function(item) {
+          if (!item || !item.name) return;
+          const key = item.name.toLowerCase();
+          if (seen[key]) return;
+          seen[key] = true;
+          merged.push(item);
+        });
+      });
+      return merged;
+    }
+
+    async function fetchOnlineDiagnosisSuggestions(query, signal) {
+      const cacheKey = query.toLowerCase();
+      if (diagnosisSuggestionCache[cacheKey]) {
+        return diagnosisSuggestionCache[cacheKey];
+      }
+
+      const params = new URLSearchParams({
+        terms: query,
+        maxList: '8',
+        df: 'consumer_name,primary_name'
+      });
+      const response = await fetch(CONDITIONS_API_URL + '?' + params.toString(), { signal: signal });
+      if (!response.ok) throw new Error('Condition lookup failed');
+
+      const data = await response.json();
+      const displayRows = Array.isArray(data[3]) ? data[3] : [];
+      const suggestions = displayRows.map(function(row) {
+        const consumerName = row[0] || row[1];
+        const primaryName = row[1] || row[0];
+        return {
+          name: consumerName,
+          category: primaryName && primaryName !== consumerName
+            ? 'Online medical condition - ' + primaryName
+            : 'Online medical condition'
+        };
+      }).filter(function(item) {
+        return !!item.name;
+      });
+
+      diagnosisSuggestionCache[cacheKey] = suggestions;
+      return suggestions;
+    }
+
+    async function fetchOnlineMedicineSuggestions(query, signal) {
+      const cacheKey = query.toLowerCase();
+      if (medicineSuggestionCache[cacheKey]) {
+        return medicineSuggestionCache[cacheKey];
+      }
+
+      const params = new URLSearchParams({
+        terms: query,
+        maxList: '8'
+      });
+      const response = await fetch(RXTERMS_API_URL + '?' + params.toString(), { signal: signal });
+      if (!response.ok) throw new Error('Medicine lookup failed');
+
+      const data = await response.json();
+      const displayRows = Array.isArray(data[3]) ? data[3] : [];
+      const codes = Array.isArray(data[1]) ? data[1] : [];
+      const suggestions = displayRows.map(function(row, index) {
+        return {
+          name: row[0] || codes[index],
+          category: 'Online allopathic medicine'
+        };
+      }).filter(function(item) {
+        return !!item.name;
+      });
+
+      medicineSuggestionCache[cacheKey] = suggestions;
+      return suggestions;
+    }
+
+    async function refreshDiagnosisSuggestions(query) {
+      if (!query || query.length < 2) return;
+      if (diagnosisSuggestTimer) clearTimeout(diagnosisSuggestTimer);
+      if (diagnosisSuggestController) diagnosisSuggestController.abort();
+
+      const localMatches = getLocalDiagnosisSuggestions(query, commonDiagnoses);
+      showSuggestions('diagnosis', localMatches);
+
+      try {
+        diagnosisSuggestController = new AbortController();
+        const onlineMatches = await fetchOnlineDiagnosisSuggestions(query, diagnosisSuggestController.signal);
+        const field = document.getElementById('diagnosis');
+        if (!field || field.value.trim() !== query) return;
+        showSuggestions('diagnosis', mergeSuggestions(onlineMatches, localMatches).slice(0, 8));
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.warn('Online diagnosis lookup failed:', error);
+        }
+      }
+    }
+
+    async function refreshMedicineSuggestions(query) {
+      if (!query || query.length < 2) return;
+      if (medicineSuggestTimer) clearTimeout(medicineSuggestTimer);
+      if (medicineSuggestController) medicineSuggestController.abort();
+
+      const localMatches = getLocalDiagnosisSuggestions(query, commonMedicines);
+      showSuggestions('medicines', localMatches);
+
+      try {
+        medicineSuggestController = new AbortController();
+        const onlineMatches = await fetchOnlineMedicineSuggestions(query, medicineSuggestController.signal);
+        const field = document.getElementById('medicines');
+        if (!field || getCurrentMedicineSegment(field).query !== query) return;
+        showSuggestions('medicines', mergeSuggestions(onlineMatches, localMatches).slice(0, 8));
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.warn('Online medicine lookup failed:', error);
+        }
+      }
+    }
+
+    function handleVoicePostProcess(fieldId) {
+      if (fieldId === 'diagnosis') {
+        const field = document.getElementById('diagnosis');
+        if (field) refreshDiagnosisSuggestions(field.value.trim());
+      } else if (fieldId === 'medicines') {
+        const field = document.getElementById('medicines');
+        if (field) refreshMedicineSuggestions(getCurrentMedicineSegment(field).query);
+      }
     }
 
     function selectSuggestion(fieldId, index) {
@@ -1677,7 +2126,11 @@
       const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
 
       if (index >= 0 && index < currentSuggestions.length) {
-        field.value = currentSuggestions[index].name;
+        if (fieldId === 'medicines') {
+          replaceCurrentMedicineSegment(field, currentSuggestions[index].name);
+        } else {
+          field.value = currentSuggestions[index].name;
+        }
         suggestionsDiv.classList.remove('show');
         field.focus();
       }
@@ -1686,9 +2139,13 @@
     function handleAutocomplete(fieldId, dataList) {
       const field = document.getElementById(fieldId);
       if (!field) return;
+      if (field.dataset.autocompleteBound === 'true') return;
+      field.dataset.autocompleteBound = 'true';
 
       field.addEventListener('input', function() {
-        const query = this.value.trim().toLowerCase();
+        const query = fieldId === 'medicines'
+          ? getCurrentMedicineSegment(this).query
+          : this.value.trim();
 
         if (query.length < 2) {
           const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
@@ -1696,8 +2153,27 @@
           return;
         }
 
+        if (fieldId === 'diagnosis') {
+          diagnosisSuggestTimer = setTimeout(async function() {
+            refreshDiagnosisSuggestions(query);
+          }, 350);
+          const localMatches = getLocalDiagnosisSuggestions(query, dataList);
+          showSuggestions(fieldId, localMatches);
+          return;
+        }
+
+        if (fieldId === 'medicines') {
+          medicineSuggestTimer = setTimeout(async function() {
+            refreshMedicineSuggestions(query);
+          }, 350);
+          const localMatches = getLocalDiagnosisSuggestions(query, dataList);
+          showSuggestions(fieldId, localMatches);
+          return;
+        }
+
+        const normalizedQuery = query.toLowerCase();
         const matches = dataList.filter(item =>
-          item.name.toLowerCase().includes(query)
+          item.name.toLowerCase().includes(normalizedQuery)
         ).slice(0, 8);
 
         showSuggestions(fieldId, matches);
@@ -1782,7 +2258,9 @@
         document.getElementById('user-info').textContent = `Logged in as: ${savedUser}`;
 
         initVoiceRecognition();
+        bindVoiceButtons();
         handleAutocomplete('diagnosis', commonDiagnoses);
+        handleAutocomplete('medicines', commonMedicines);
         resetInactivityTimer();
 
         updateSyncStatus('offline', 'Checking connection...');
