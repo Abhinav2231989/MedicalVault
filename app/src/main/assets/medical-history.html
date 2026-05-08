@@ -1298,6 +1298,18 @@
       }, 45000);
     }
 
+    function scheduleAutoSync() {
+      if (!GoogleDriveSync.isSignedIn()) {
+        updateSyncStatus('offline', 'Working offline - Click to sync');
+        return;
+      }
+      if (window._autoSyncTimer) clearTimeout(window._autoSyncTimer);
+      window._autoSyncTimer = setTimeout(function() {
+        window._autoSyncTimer = null;
+        triggerSync();
+      }, 1000);
+    }
+
     async function manualSync() {
       // Always attempt on manual button tap — let Android handle auth if needed
       if (typeof GoogleDrive === 'undefined') {
@@ -1323,7 +1335,7 @@
     }, 300000);
 
     const CORRECT_PIN = '258411';
-    const AUTO_LOGOUT_TIME = 15 * 60 * 1000;
+    const AUTO_LOGOUT_TIME = 30 * 60 * 1000;
     let currentUser = null;
     let searchActive = false;
     let showAllActive = false;
@@ -1355,7 +1367,7 @@
     }
 
     function setupActivityListeners() {
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      const events = ['mousedown', 'mousemove', 'keydown', 'keypress', 'input', 'scroll', 'touchstart', 'click'];
 
       events.forEach(event => {
         document.addEventListener(event, () => {
@@ -1644,9 +1656,7 @@
         loadRecords();
       }
 
-      if (GoogleDriveSync.isSignedIn()) {
-        setTimeout(triggerSync, 1000);
-      }
+      scheduleAutoSync();
     }
 
     async function loadRecords() {
@@ -1751,9 +1761,7 @@
         showSuccessMessage('✓ Record deleted successfully!');
         loadRecords();
 
-        if (GoogleDriveSync.isSignedIn()) {
-          setTimeout(triggerSync, 1000);
-        }
+        scheduleAutoSync();
       }
     }
 
