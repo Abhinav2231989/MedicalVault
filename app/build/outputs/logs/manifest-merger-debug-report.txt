@@ -4,7 +4,6 @@ ADDED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManife
 INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml:2:1-32:12
 INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml:2:1-32:12
 INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml:2:1-32:12
-MERGED from [androidx.databinding:viewbinding:8.13.2] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\ba5c5689facacc50d6774bfa8409b6fc\transformed\jetified-viewbinding-8.13.2\AndroidManifest.xml:2:1-7:12
 MERGED from [com.google.android.material:material:1.11.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\6887ff90426dc88a165863bf136cc5f6\transformed\material-1.11.0\AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\302090272ae931057406c3af5a1aef6e\transformed\constraintlayout-2.1.4\AndroidManifest.xml:2:1-11:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\f30b973d278c002e8a007d06625f46d7\transformed\jetified-appcompat-resources-1.6.1\AndroidManifest.xml:17:1-22:12
@@ -41,6 +40,7 @@ MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.1] C:\Users\AbhinavShaury
 MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\46d4218185e9de6b7783ef7a7c2f5f0c\transformed\lifecycle-viewmodel-2.6.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\6fec966de8a29f2e0dabf41e39a05f20\transformed\lifecycle-runtime-2.6.1\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c7ca38457f9b762c0e53d3603f58b182\transformed\jetified-lifecycle-viewmodel-savedstate-2.6.1\AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c1f69182e95b8b33c6e9f905baf2afe8\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c5d36a3276dcea7035a4e4eab0a0621a\transformed\cursoradapter-1.0.0\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.cardview:cardview:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\b1e8de2c6399c37af4debda0ffe20c20\transformed\cardview-1.0.0\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.interpolator:interpolator:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\769b90b77c99fc6976e94aa6888d0b35\transformed\interpolator-1.0.0\AndroidManifest.xml:17:1-22:12
@@ -52,7 +52,6 @@ MERGED from [androidx.arch.core:core-runtime:2.2.0] C:\Users\AbhinavShaurya\.gra
 MERGED from [androidx.documentfile:documentfile:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\411c691b86a28736451b16d25877e80f\transformed\documentfile-1.0.0\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\0ef09247b5b3d917cf52bcc6e28bc783\transformed\localbroadcastmanager-1.0.0\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.print:print:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\f04dc0948baf5cdc76ee3f43cb21b6bd\transformed\print-1.0.0\AndroidManifest.xml:17:1-22:12
-MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c1f69182e95b8b33c6e9f905baf2afe8\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:17:1-22:12
 	package
 		ADDED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml:3:5-31
 		INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml
@@ -153,8 +152,6 @@ uses-sdk
 INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml
 INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml
-MERGED from [androidx.databinding:viewbinding:8.13.2] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\ba5c5689facacc50d6774bfa8409b6fc\transformed\jetified-viewbinding-8.13.2\AndroidManifest.xml:5:5-44
-MERGED from [androidx.databinding:viewbinding:8.13.2] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\ba5c5689facacc50d6774bfa8409b6fc\transformed\jetified-viewbinding-8.13.2\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.material:material:1.11.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\6887ff90426dc88a165863bf136cc5f6\transformed\material-1.11.0\AndroidManifest.xml:20:5-44
 MERGED from [com.google.android.material:material:1.11.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\6887ff90426dc88a165863bf136cc5f6\transformed\material-1.11.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\302090272ae931057406c3af5a1aef6e\transformed\constraintlayout-2.1.4\AndroidManifest.xml:5:5-7:41
@@ -227,6 +224,8 @@ MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.1] C:\Users\AbhinavShaurya
 MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\6fec966de8a29f2e0dabf41e39a05f20\transformed\lifecycle-runtime-2.6.1\AndroidManifest.xml:5:5-44
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c7ca38457f9b762c0e53d3603f58b182\transformed\jetified-lifecycle-viewmodel-savedstate-2.6.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.1] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c7ca38457f9b762c0e53d3603f58b182\transformed\jetified-lifecycle-viewmodel-savedstate-2.6.1\AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c1f69182e95b8b33c6e9f905baf2afe8\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c1f69182e95b8b33c6e9f905baf2afe8\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c5d36a3276dcea7035a4e4eab0a0621a\transformed\cursoradapter-1.0.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c5d36a3276dcea7035a4e4eab0a0621a\transformed\cursoradapter-1.0.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.cardview:cardview:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\b1e8de2c6399c37af4debda0ffe20c20\transformed\cardview-1.0.0\AndroidManifest.xml:20:5-44
@@ -249,8 +248,6 @@ MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] C:\User
 MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\0ef09247b5b3d917cf52bcc6e28bc783\transformed\localbroadcastmanager-1.0.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.print:print:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\f04dc0948baf5cdc76ee3f43cb21b6bd\transformed\print-1.0.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.print:print:1.0.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\f04dc0948baf5cdc76ee3f43cb21b6bd\transformed\print-1.0.0\AndroidManifest.xml:20:5-44
-MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c1f69182e95b8b33c6e9f905baf2afe8\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:20:5-44
-MERGED from [androidx.annotation:annotation-experimental:1.3.0] C:\Users\AbhinavShaurya\.gradle\caches\8.13\transforms\c1f69182e95b8b33c6e9f905baf2afe8\transformed\jetified-annotation-experimental-1.3.0\AndroidManifest.xml:20:5-44
 	android:targetSdkVersion
 		INJECTED from C:\MedicalHisApp\MedVaultApp\MedVaultAppv3\app\src\main\AndroidManifest.xml
 	android:minSdkVersion
