@@ -561,6 +561,34 @@
           color: var(--text-secondary);
           margin-top: 0.25rem;
         }
+
+        .report-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          margin-top: 0.5rem;
+          font-size: 0.8rem;
+        }
+
+        .report-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 0.55rem 0.7rem;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: var(--bg-light);
+        }
+
+        .report-item a {
+          color: var(--primary);
+          text-decoration: none;
+          word-break: break-word;
+        }
+
+        .report-item a:hover {
+          text-decoration: underline;
+        }
     </style>
 
 </head>
@@ -705,8 +733,14 @@
                 </div>
             </div>
 
+            <div class="form-group">
+                <label>Reports <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
+                <input type="file" id="report-files" multiple>
+                <div id="selected-reports-list" class="report-list"></div>
+            </div>
+
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Record</button>
+                <button type="submit" class="btn btn-primary" id="save-record-btn" style="flex: 1;">Save Record</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">Cancel</button>
             </div>
         </form>
@@ -780,7 +814,8 @@
 
     var _syncRetryCount = 0;
     var _uploadInProgress = false;
-    var _LOCK_TTL = 30000; // 30 seconds — covers worst-case upload duration
+    var _LOCK_TTL = 300000; // 5 minutes — covers report upload + JSON sync
+    var _pendingReportUpload = null;
 
     // Stable device ID so each phone can identify itself in the lock field
     function _getDeviceId() {
@@ -1138,6 +1173,7 @@
     window.onDriveReady = function(isReady) {
       if (isReady) {
         updateSyncStatus('synced', 'Google Drive connected');
+        resumePendingReportUpload();
         showSuccessMessage('✓ Connected to Google Drive');
       } else {
         updateSyncStatus('offline', 'Not connected to Drive');
@@ -1340,6 +1376,7 @@
     let searchActive = false;
     let showAllActive = false;
     let editingRecordId = null;
+    let editingReportLinks = [];
     let inactivityTimer = null;
     let lastActivityTime = Date.now();
 
@@ -1375,6 +1412,15 @@
             resetInactivityTimer();
           }
         }, true);
+      });
+    }
+
+    function bindReportInput() {
+      const input = document.getElementById('report-files');
+      if (!input || input.dataset.reportBound === 'true') return;
+      input.dataset.reportBound = 'true';
+      input.addEventListener('change', function() {
+        renderSelectedReports(editingReportLinks);
       });
     }
 
@@ -1520,10 +1566,55 @@
       setTimeout(() => warningDiv.classList.remove('show'), 3000);
     }
 
+    function getReportLinkUrl(report) {
+      return report.webViewLink || report.webContentLink || report.url || '';
+    }
+
+    function openReportLink(url) {
+      if (!url) {
+        showWarningMessage('Report link is not available');
+        return;
+      }
+      if (typeof GoogleDrive !== 'undefined' && GoogleDrive.openUrl) {
+        GoogleDrive.openUrl(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    }
+
+    function renderSelectedReports(existingReports) {
+      const list = document.getElementById('selected-reports-list');
+      const input = document.getElementById('report-files');
+      if (!list || !input) return;
+
+      const existing = (existingReports || []).map(function(report, index) {
+        const url = getReportLinkUrl(report);
+        return `
+          <div class="report-item">
+            <a href="#" onclick='openReportLink(${JSON.stringify(url)}); return false;'>${escapeHtml(report.originalName || report.name || 'Report')}</a>
+            ${editingRecordId ? `<button type="button" class="btn btn-secondary btn-small" onclick="deleteAttachedReport(${index})">Delete</button>` : '<span>Saved</span>'}
+          </div>
+        `;
+      });
+
+      const selected = Array.from(input.files || []).map(function(file) {
+        return `
+          <div class="report-item">
+            <span>${escapeHtml(file.name)}</span>
+            <span>${Math.ceil(file.size / 1024)} KB</span>
+          </div>
+        `;
+      });
+
+      list.innerHTML = existing.concat(selected).join('') || '<span style="color: var(--text-dim);">No reports attached</span>';
+    }
+
     function showAddForm() {
       editingRecordId = null;
+      editingReportLinks = [];
       document.getElementById('modal-title').textContent = 'Add Patient Record';
       document.getElementById('patient-form').reset();
+      renderSelectedReports([]);
       document.getElementById('patient-modal').classList.add('show');
     }
 
@@ -1538,12 +1629,16 @@
       document.getElementById('date-of-visit').value = record.dateOfVisit;
       document.getElementById('diagnosis').value = record.diagnosis;
       document.getElementById('medicines').value = record.medicines || '';
+      editingReportLinks = Array.isArray(record.reportLinks) ? record.reportLinks.slice() : [];
+      document.getElementById('report-files').value = '';
+      renderSelectedReports(editingReportLinks);
       document.getElementById('patient-modal').classList.add('show');
     }
 
     function closeModal() {
       document.getElementById('patient-modal').classList.remove('show');
       editingRecordId = null;
+      editingReportLinks = [];
       stopVoiceInput();
     }
 
@@ -1606,8 +1701,303 @@
       }
     }
 
+    const reportUploadRequests = {};
+    const reportDeleteRequests = {};
+
+    window.onReportUploadComplete = function(success, payloadJson) {
+      let payload;
+      try {
+        payload = payloadJson ? JSON.parse(payloadJson) : {};
+      } catch (e) {
+        payload = { error: 'Invalid upload response' };
+      }
+
+      const request = reportUploadRequests[payload.requestId];
+      if (!request) return;
+      delete reportUploadRequests[payload.requestId];
+
+      if (success) {
+        request.resolve(payload.reports || (payload.report ? [payload.report] : []));
+      } else {
+        request.reject(new Error(payload.error || 'Report upload failed'));
+      }
+    };
+
+    window.onReportDeleteComplete = function(success, payloadJson) {
+      let payload;
+      try {
+        payload = payloadJson ? JSON.parse(payloadJson) : {};
+      } catch (e) {
+        payload = { error: 'Invalid delete response' };
+      }
+
+      const request = reportDeleteRequests[payload.requestId];
+      if (!request) return;
+      delete reportDeleteRequests[payload.requestId];
+
+      if (success) {
+        request.resolve();
+      } else {
+        request.reject(new Error(payload.error || 'Report delete failed'));
+      }
+    };
+
+    function deleteReportFromDrive(fileId) {
+      return new Promise(function(resolve, reject) {
+        if (typeof GoogleDrive === 'undefined') {
+          reject(new Error('Google Drive is not available in this app build'));
+          return;
+        }
+        if (!GoogleDriveSync.isSignedIn()) {
+          GoogleDriveSync.signIn();
+          reject(new Error('Connect to Google Drive and try deleting the report again'));
+          return;
+        }
+        if (!fileId) {
+          reject(new Error('Report file id is missing'));
+          return;
+        }
+
+        const requestId = 'delete_report_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const timeoutId = setTimeout(function() {
+          delete reportDeleteRequests[requestId];
+          reject(new Error('Report delete timed out. Check Drive connection and try again.'));
+        }, 60000);
+        reportDeleteRequests[requestId] = {
+          resolve: function() {
+            clearTimeout(timeoutId);
+            resolve();
+          },
+          reject: function(error) {
+            clearTimeout(timeoutId);
+            reject(error);
+          }
+        };
+        GoogleDrive.deleteReport(requestId, fileId);
+      });
+    };
+
+    async function deleteAttachedReport(index) {
+      if (!editingRecordId || index < 0 || index >= editingReportLinks.length) return;
+      const report = editingReportLinks[index];
+      const reportName = report.originalName || report.name || 'this report';
+      if (!confirm('Delete ' + reportName + ' from this record and Google Drive?')) return;
+
+      try {
+        updateSyncStatus('syncing', 'Deleting report from Google Drive...');
+        GoogleDriveSync.uploadData();
+        await deleteReportFromDrive(report.id);
+        editingReportLinks.splice(index, 1);
+        renderSelectedReports(editingReportLinks);
+
+        const records = await loadData('patient-records');
+        const recordIndex = records.findIndex(function(record) {
+          return String(record.id) === String(editingRecordId);
+        });
+        if (recordIndex !== -1) {
+          records[recordIndex].reportLinks = editingReportLinks.slice();
+          records[recordIndex].timestamp = new Date().toISOString();
+          await saveData('patient-records', records);
+          scheduleAutoSync();
+        }
+
+        showSuccessMessage('Report deleted successfully');
+      } catch (error) {
+        console.error('Report delete error:', error);
+        showWarningMessage(error.message || 'Report delete failed');
+      }
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise(function(resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function() { resolve(reader.result); };
+        reader.onerror = function() { reject(reader.error || new Error('Could not read file')); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function canvasToBlob(canvas, type, quality) {
+      return new Promise(function(resolve) {
+        canvas.toBlob(function(blob) {
+          resolve(blob);
+        }, type, quality);
+      });
+    }
+
+    async function compressImageFile(file) {
+      try {
+        if (!file.type || !file.type.startsWith('image/')) return file;
+        if (file.size <= 700 * 1024) return file;
+
+        const dataUrl = await readFileAsDataUrl(file);
+        const image = await new Promise(function(resolve, reject) {
+          const img = new Image();
+          img.onload = function() { resolve(img); };
+          img.onerror = function() { reject(new Error('Could not compress image')); };
+          img.src = dataUrl;
+        });
+
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const outputType = 'image/jpeg';
+        const blob = await canvasToBlob(canvas, outputType, 0.75);
+        if (!blob || blob.size >= file.size) return file;
+
+        const compressedName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+        return new File([blob], compressedName, { type: outputType, lastModified: Date.now() });
+      } catch (error) {
+        console.warn('Image compression failed, uploading original file:', error);
+        return file;
+      }
+    }
+
+    function uploadReportToDrive(patientId, file) {
+      return new Promise(async function(resolve, reject) {
+        if (typeof GoogleDrive === 'undefined' || !GoogleDriveSync.isSignedIn()) {
+          reject(new Error('Connect to Google Drive before attaching reports'));
+          return;
+        }
+
+        try {
+          const preparedFile = await compressImageFile(file);
+          const dataUrl = await readFileAsDataUrl(preparedFile);
+          const base64 = String(dataUrl).split(',')[1] || '';
+          const requestId = 'report_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+          const timeoutId = setTimeout(function() {
+            delete reportUploadRequests[requestId];
+            reject(new Error('Report upload timed out. Check Drive connection and try again.'));
+          }, 120000);
+          reportUploadRequests[requestId] = {
+            resolve: function(value) {
+              clearTimeout(timeoutId);
+              resolve(value);
+            },
+            reject: function(error) {
+              clearTimeout(timeoutId);
+              reject(error);
+            }
+          };
+          GoogleDrive.uploadReport(
+            requestId,
+            patientId,
+            preparedFile.name,
+            preparedFile.type || 'application/octet-stream',
+            base64
+          );
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+
+    function uploadSelectedReports(patientId) {
+      const input = document.getElementById('report-files');
+      const files = Array.from((input && input.files) || []);
+      const nativeFileCount = (typeof GoogleDrive !== 'undefined' && GoogleDrive.getSelectedReportCount)
+        ? GoogleDrive.getSelectedReportCount()
+        : 0;
+      const selectedCount = Math.max(files.length, nativeFileCount);
+      if (selectedCount === 0) return Promise.resolve([]);
+
+      return new Promise(function(resolve, reject) {
+        if (typeof GoogleDrive === 'undefined') {
+          reject(new Error('Google Drive is not available in this app build'));
+          return;
+        }
+        if (!GoogleDriveSync.isSignedIn()) {
+          reject(new Error('DRIVE_SIGN_IN_REQUIRED'));
+          return;
+        }
+
+        const requestId = 'reports_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const timeoutId = setTimeout(function() {
+          delete reportUploadRequests[requestId];
+          reject(new Error('Report upload timed out. Check Drive connection and try again.'));
+        }, 120000);
+
+        reportUploadRequests[requestId] = {
+          resolve: function(value) {
+            clearTimeout(timeoutId);
+            resolve(value);
+          },
+          reject: function(error) {
+            clearTimeout(timeoutId);
+            reject(error);
+          }
+        };
+
+        updateSyncStatus('syncing', 'Uploading reports to Google Drive...');
+        showSuccessMessage('Uploading ' + selectedCount + ' report(s) in background...');
+        GoogleDrive.uploadSelectedReports(requestId, patientId);
+      });
+    }
+
+    function resumePendingReportUpload() {
+      if (!_pendingReportUpload || !GoogleDriveSync.isSignedIn()) return;
+      const pending = _pendingReportUpload;
+      _pendingReportUpload = null;
+      showSuccessMessage('Google Drive connected. Uploading attached report(s)...');
+      attachUploadedReportsToRecord(pending.recordId, pending.patientId, pending.fileCount);
+    }
+
+    async function attachUploadedReportsToRecord(recordId, patientId, fileCount) {
+      try {
+        if (!GoogleDriveSync.isSignedIn()) {
+          _pendingReportUpload = {
+            recordId: recordId,
+            patientId: patientId,
+            fileCount: fileCount
+          };
+          updateSyncStatus('syncing', 'Connecting to Google Drive for report upload...');
+          showWarningMessage('Connecting to Google Drive to upload attached report(s)...');
+          GoogleDriveSync.signIn();
+          return;
+        }
+
+        updateSyncStatus('syncing', 'Locking sync and uploading reports...');
+        GoogleDriveSync.uploadData();
+        const uploadedReports = await uploadSelectedReports(patientId);
+        if (!uploadedReports.length) return;
+
+        const records = await loadData('patient-records');
+        const index = records.findIndex(function(record) {
+          return String(record.id) === String(recordId);
+        });
+        if (index === -1) return;
+
+        const existing = Array.isArray(records[index].reportLinks) ? records[index].reportLinks : [];
+        records[index].reportLinks = existing.concat(uploadedReports);
+        records[index].timestamp = new Date().toISOString();
+        await saveData('patient-records', records);
+        showSuccessMessage('Report upload complete: ' + fileCount + ' file(s)');
+        loadRecords();
+        scheduleAutoSync();
+      } catch (error) {
+        console.error('Report upload error:', error);
+        if (error.message === 'DRIVE_SIGN_IN_REQUIRED') {
+          _pendingReportUpload = {
+            recordId: recordId,
+            patientId: patientId,
+            fileCount: fileCount
+          };
+          updateSyncStatus('syncing', 'Connecting to Google Drive for report upload...');
+          GoogleDriveSync.signIn();
+        } else {
+          showWarningMessage(error.message || 'Report upload failed. Record was saved without report links.');
+        }
+      }
+    }
+
     async function savePatientRecord(event) {
       event.preventDefault();
+      const saveBtn = document.getElementById('save-record-btn');
       const patientName = document.getElementById('patient-name').value.trim();
       const phoneNumber = document.getElementById('phone-number').value.trim();
       const dateOfVisit = document.getElementById('date-of-visit').value;
@@ -1621,6 +2011,17 @@
 
       const patientId = await getOrCreatePatientId(patientName);
       const status = medicines ? 'Complete' : 'In Progress';
+      const nativeReportCount = (typeof GoogleDrive !== 'undefined' && GoogleDrive.getSelectedReportCount)
+        ? GoogleDrive.getSelectedReportCount()
+        : 0;
+      const selectedReportCount = Math.max((document.getElementById('report-files').files || []).length, nativeReportCount);
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+
+      const existingReportLinks = editingRecordId ? editingReportLinks : [];
+      const reportLinks = existingReportLinks.slice();
 
       const record = {
         id: editingRecordId || Date.now(),
@@ -1631,6 +2032,7 @@
         diagnosis: diagnosis,
         medicines: medicines || '',
         status: status,
+        reportLinks: reportLinks,
         timestamp: new Date().toISOString()
       };
 
@@ -1657,6 +2059,13 @@
       }
 
       scheduleAutoSync();
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Record';
+      }
+      if (selectedReportCount > 0) {
+        attachUploadedReportsToRecord(record.id, patientId, selectedReportCount);
+      }
     }
 
     async function loadRecords() {
@@ -1737,11 +2146,24 @@
       const fieldsHtml = fields.map(f => `
         <div class="detail-field">
           <span class="detail-field-label">${f.label}</span>
-          <span class="detail-field-value">${f.value}</span>
+          <span class="detail-field-value">${escapeHtml(f.value)}</span>
         </div>
       `).join('');
 
-      document.getElementById('detail-body').innerHTML = fieldsHtml;
+      const reports = Array.isArray(record.reportLinks) ? record.reportLinks : [];
+      const reportsHtml = `
+        <div class="detail-field">
+          <span class="detail-field-label">Reports</span>
+          <span class="detail-field-value">
+            ${reports.length ? reports.map(function(report) {
+              const url = getReportLinkUrl(report);
+              return '<div class="report-item"><a href="#" onclick=\'openReportLink(' + JSON.stringify(url) + '); return false;\'>' + escapeHtml(report.originalName || report.name || 'Report') + '</a></div>';
+            }).join('') : 'No reports attached'}
+          </span>
+        </div>
+      `;
+
+      document.getElementById('detail-body').innerHTML = fieldsHtml + reportsHtml;
 
       document.getElementById('detail-edit-btn').onclick = () => {
         closeDetailModal();
@@ -2251,6 +2673,7 @@
 
     window.addEventListener('load', () => {
       setupActivityListeners();
+      bindReportInput();
 
       let savedUser;
       if (typeof AndroidStorage !== 'undefined') {

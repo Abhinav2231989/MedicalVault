@@ -4,8 +4,13 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.Cursor
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.util.Base64
 import android.webkit.*
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -29,6 +34,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
     
@@ -39,12 +48,14 @@ class MainActivity : AppCompatActivity() {
     
     // File chooser support
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var selectedReportUris: List<Uri> = emptyList()
     private val FILE_CHOOSER_REQUEST_CODE = 1
     private val PERMISSION_REQUEST_CODE = 100
     
     companion object {
         private const val RC_SIGN_IN = 9001
         private const val MEDVAULT_FOLDER = "MedVault_Data"
+        private const val REPORTS_FOLDER = "Reports"
         private const val DATA_FILE = "patient_records.json"
     }
 
@@ -159,12 +170,6 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
-                    putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
-                        "image/*",
-                        "application/pdf",
-                        "application/msword",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ))
                     putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                 }
 
@@ -222,6 +227,7 @@ class MainActivity : AppCompatActivity() {
                     null
                 }
 
+                selectedReportUris = results?.toList() ?: emptyList()
                 filePathCallback?.onReceiveValue(results)
                 filePathCallback = null
             }
@@ -239,6 +245,17 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 val signInIntent = googleSignInClient.signInIntent
                 startActivityForResult(signInIntent, RC_SIGN_IN)
+            }
+        }
+
+        @JavascriptInterface
+        fun openUrl(url: String) {
+            runOnUiThread {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Cannot open report link", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -269,6 +286,81 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
                         notifySyncComplete(false, "Download failed: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun uploadReport(
+            requestId: String,
+            patientId: String,
+            originalName: String,
+            mimeType: String,
+            base64Content: String
+        ) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val report = uploadReportToGoogleDrive(patientId, originalName, mimeType, base64Content)
+                    report.put("requestId", requestId)
+                    withContext(Dispatchers.Main) {
+                        notifyReportUploadComplete(true, report.toString())
+                    }
+                } catch (e: Exception) {
+                    val payload = JSONObject()
+                        .put("requestId", requestId)
+                        .put("error", e.message ?: "Report upload failed")
+                    withContext(Dispatchers.Main) {
+                        notifyReportUploadComplete(false, payload.toString())
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun getSelectedReportCount(): Int {
+            return selectedReportUris.size
+        }
+
+        @JavascriptInterface
+        fun uploadSelectedReports(requestId: String, patientId: String) {
+            val uris = selectedReportUris.toList()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val reports = uploadSelectedReportUrisToGoogleDrive(patientId, uris)
+                    selectedReportUris = emptyList()
+                    val payload = JSONObject()
+                        .put("requestId", requestId)
+                        .put("reports", reports)
+                    withContext(Dispatchers.Main) {
+                        notifyReportUploadComplete(true, payload.toString())
+                    }
+                } catch (e: Exception) {
+                    val payload = JSONObject()
+                        .put("requestId", requestId)
+                        .put("error", e.message ?: "Report upload failed")
+                    withContext(Dispatchers.Main) {
+                        notifyReportUploadComplete(false, payload.toString())
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun deleteReport(requestId: String, fileId: String) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    deleteReportFromGoogleDrive(fileId)
+                    val payload = JSONObject().put("requestId", requestId)
+                    withContext(Dispatchers.Main) {
+                        notifyReportDeleteComplete(true, payload.toString())
+                    }
+                } catch (e: Exception) {
+                    val payload = JSONObject()
+                        .put("requestId", requestId)
+                        .put("error", e.message ?: "Report delete failed")
+                    withContext(Dispatchers.Main) {
+                        notifyReportDeleteComplete(false, payload.toString())
                     }
                 }
             }
@@ -370,17 +462,23 @@ class MainActivity : AppCompatActivity() {
         outputStream.toString("UTF-8")
     }
 
-    private fun getOrCreateFolder(service: Drive): String {
+    private fun getOrCreateFolder(
+        service: Drive,
+        folderName: String = MEDVAULT_FOLDER,
+        parentFolderId: String? = null
+    ): String {
+        val parentClause = parentFolderId?.let { " and '$it' in parents" } ?: ""
         val result = service.files().list()
-            .setQ("name='$MEDVAULT_FOLDER' and mimeType='application/vnd.google-apps.folder' and trashed=false")
+            .setQ("name='${escapeDriveQueryValue(folderName)}' and mimeType='application/vnd.google-apps.folder'$parentClause and trashed=false")
             .setSpaces("drive")
             .setFields("files(id, name)")
             .execute()
 
         return if (result.files.isEmpty()) {
             val folderMetadata = File().apply {
-                name = MEDVAULT_FOLDER
+                name = folderName
                 mimeType = "application/vnd.google-apps.folder"
+                parentFolderId?.let { parents = listOf(it) }
             }
             service.files().create(folderMetadata)
                 .setFields("id")
@@ -391,9 +489,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun escapeDriveQueryValue(value: String): String {
+        return value.replace("\\", "\\\\").replace("'", "\\'")
+    }
+
     private fun findFile(service: Drive, folderId: String, fileName: String): String? {
         val result = service.files().list()
-            .setQ("name='$fileName' and '$folderId' in parents and trashed=false")
+            .setQ("name='${escapeDriveQueryValue(fileName)}' and '$folderId' in parents and trashed=false")
             .setSpaces("drive")
             .setFields("files(id)")
             .execute()
@@ -416,10 +518,180 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private suspend fun uploadReportToGoogleDrive(
+        patientId: String,
+        originalName: String,
+        mimeType: String,
+        base64Content: String
+    ): JSONObject = withContext(Dispatchers.IO) {
+        val service = driveService ?: throw Exception("Drive service not initialized")
+        val medVaultFolderId = getOrCreateFolder(service)
+        val reportsFolderId = getOrCreateFolder(service, REPORTS_FOLDER, medVaultFolderId)
+        val bytes = Base64.decode(base64Content, Base64.DEFAULT)
+        val uploadedAt = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val driveName = buildReportFileName(patientId, originalName, uploadedAt)
+
+        val fileMetadata = File().apply {
+            name = driveName
+            parents = listOf(reportsFolderId)
+        }
+        val content = com.google.api.client.http.ByteArrayContent(
+            mimeType.ifBlank { "application/octet-stream" },
+            bytes
+        )
+
+        val uploadedFile = service.files().create(fileMetadata, content)
+            .setFields("id, name, webViewLink, webContentLink")
+            .execute()
+
+        JSONObject()
+            .put("report", JSONObject()
+                .put("id", uploadedFile.id)
+                .put("name", uploadedFile.name)
+                .put("originalName", originalName)
+                .put("mimeType", mimeType)
+                .put("uploadedAt", uploadedAt)
+                .put("webViewLink", uploadedFile.webViewLink ?: "")
+                .put("webContentLink", uploadedFile.webContentLink ?: "")
+            )
+    }
+
+    private suspend fun uploadSelectedReportUrisToGoogleDrive(
+        patientId: String,
+        uris: List<Uri>
+    ): JSONArray = withContext(Dispatchers.IO) {
+        val service = driveService ?: throw Exception("Drive service not initialized")
+        val medVaultFolderId = getOrCreateFolder(service)
+        val reportsFolderId = getOrCreateFolder(service, REPORTS_FOLDER, medVaultFolderId)
+        if (uris.isEmpty()) {
+            throw Exception("No report file was selected. Please attach the report again.")
+        }
+        val reports = JSONArray()
+
+        uris.forEach { uri ->
+            val originalName = getDisplayName(uri)
+            val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+            val bytes = readReportBytes(uri, mimeType)
+            val uploadedAt = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val driveName = buildReportFileName(patientId, originalName, uploadedAt)
+
+            val fileMetadata = File().apply {
+                name = driveName
+                parents = listOf(reportsFolderId)
+            }
+            val content = com.google.api.client.http.ByteArrayContent(
+                if (mimeType.startsWith("image/")) "image/jpeg" else mimeType,
+                bytes
+            )
+            val uploadedFile = service.files().create(fileMetadata, content)
+                .setFields("id, name, webViewLink, webContentLink")
+                .execute()
+
+            reports.put(JSONObject()
+                .put("id", uploadedFile.id)
+                .put("name", uploadedFile.name)
+                .put("originalName", originalName)
+                .put("mimeType", if (mimeType.startsWith("image/")) "image/jpeg" else mimeType)
+                .put("uploadedAt", uploadedAt)
+                .put("webViewLink", uploadedFile.webViewLink ?: "")
+                .put("webContentLink", uploadedFile.webContentLink ?: "")
+            )
+        }
+
+        reports
+    }
+
+    private fun readReportBytes(uri: Uri, mimeType: String): ByteArray {
+        val originalBytes = contentResolver.openInputStream(uri)?.use { input ->
+            input.readBytes()
+        } ?: throw Exception("Could not read selected report")
+
+        if (!mimeType.startsWith("image/") || originalBytes.size <= 700 * 1024) {
+            return originalBytes
+        }
+
+        return try {
+            val bitmap = BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size)
+                ?: return originalBytes
+            val maxSide = 1600f
+            val scale = minOf(1f, maxSide / maxOf(bitmap.width, bitmap.height).toFloat())
+            val outputBitmap = if (scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    maxOf(1, (bitmap.width * scale).toInt()),
+                    maxOf(1, (bitmap.height * scale).toInt()),
+                    true
+                )
+            } else {
+                bitmap
+            }
+            val output = ByteArrayOutputStream()
+            outputBitmap.compress(Bitmap.CompressFormat.JPEG, 75, output)
+            val compressed = output.toByteArray()
+            if (compressed.isNotEmpty() && compressed.size < originalBytes.size) compressed else originalBytes
+        } catch (e: Exception) {
+            originalBytes
+        }
+    }
+
+    private fun getDisplayName(uri: Uri): String {
+        var name: String? = null
+        val cursor: Cursor? = contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0 && it.moveToFirst()) {
+                name = it.getString(nameIndex)
+            }
+        }
+        return name ?: uri.lastPathSegment ?: "Report"
+    }
+
+    private suspend fun deleteReportFromGoogleDrive(fileId: String) = withContext(Dispatchers.IO) {
+        val service = driveService ?: throw Exception("Drive service not initialized")
+        if (fileId.isBlank()) throw Exception("Report file id is missing")
+        service.files().delete(fileId).execute()
+    }
+
+    private fun buildReportFileName(patientId: String, originalName: String, uploadedAt: String): String {
+        val safePatientId = sanitizeFileName(patientId.ifBlank { "Patient" })
+        val safeOriginal = sanitizeFileName(originalName.ifBlank { "Report" })
+        val dotIndex = safeOriginal.lastIndexOf('.')
+        val baseName = if (dotIndex > 0) safeOriginal.substring(0, dotIndex) else safeOriginal
+        val extension = if (dotIndex > 0 && dotIndex < safeOriginal.length - 1) safeOriginal.substring(dotIndex) else ""
+        return "${safePatientId}_${baseName}_${uploadedAt}${extension}"
+    }
+
+    private fun sanitizeFileName(value: String): String {
+        return value
+            .replace(Regex("[\\\\/:*?\"<>|]+"), "_")
+            .replace(Regex("\\s+"), "_")
+            .trim('_')
+            .take(120)
+            .ifBlank { "Report" }
+    }
+
     private fun notifyDataReceived(data: String?) {
         runOnUiThread {
             webView.evaluateJavascript(
                 "if(typeof onDataReceived === 'function') onDataReceived(${JSONObject.quote(data)});",
+                null
+            )
+        }
+    }
+
+    private fun notifyReportUploadComplete(success: Boolean, payloadJson: String) {
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "if(typeof onReportUploadComplete === 'function') onReportUploadComplete($success, ${JSONObject.quote(payloadJson)});",
+                null
+            )
+        }
+    }
+
+    private fun notifyReportDeleteComplete(success: Boolean, payloadJson: String) {
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "if(typeof onReportDeleteComplete === 'function') onReportDeleteComplete($success, ${JSONObject.quote(payloadJson)});",
                 null
             )
         }
