@@ -589,6 +589,51 @@
         .report-item a:hover {
           text-decoration: underline;
         }
+
+        .prescription-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          margin-top: 0.5rem;
+        }
+
+        .prescription-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 0.65rem 0.75rem;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: var(--bg-light);
+          font-size: 0.82rem;
+        }
+
+        .choice-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.5rem;
+        }
+
+        .scale-grid {
+          grid-template-columns: 1.1fr repeat(3, 1fr);
+        }
+
+        .choice-btn {
+          padding: 0.7rem 0.35rem;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: var(--bg-light);
+          color: var(--text);
+          font-family: inherit;
+          cursor: pointer;
+          text-align: center;
+        }
+
+        .choice-btn.active {
+          background: var(--primary);
+          color: white;
+          border-color: var(--primary);
+        }
     </style>
 
 </head>
@@ -734,6 +779,12 @@
             </div>
 
             <div class="form-group">
+                <label>Prescription <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
+                <button type="button" class="btn btn-primary btn-small" style="width: 100%;" onclick="openPrescriptionModal()">+ Add Prescription</button>
+                <div id="prescription-list" class="prescription-list"></div>
+            </div>
+
+            <div class="form-group">
                 <label>Reports <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
                 <input type="file" id="report-files" multiple>
                 <div id="selected-reports-list" class="report-list"></div>
@@ -744,6 +795,66 @@
                 <button type="button" class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">Cancel</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Prescription Builder Modal -->
+<div id="prescription-modal" class="modal" onclick="if(event.target===this)closePrescriptionModal()">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Select Potency & Dosage</h2>
+            <button class="close-btn" onclick="closePrescriptionModal()">&times;</button>
+        </div>
+
+        <div class="form-group">
+            <label>Medicine Name</label>
+            <input type="text" id="prescription-medicine" placeholder="Enter medicine/remedy name">
+        </div>
+
+        <div class="form-group">
+            <label>Potency</label>
+            <input type="text" id="prescription-potency" placeholder="Any, 30, 200, 1M...">
+            <div class="choice-grid" data-prescription-group="potency" style="margin-top: 0.5rem;">
+                <button type="button" class="choice-btn active" onclick="selectPrescriptionOption('potency', 'ANY', this)">ANY</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '30', this)">30</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '200', this)">200</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '1M', this)">1M</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '10M', this)">10M</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', 'CM', this)">CM</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Scale</label>
+            <div class="choice-grid scale-grid" data-prescription-group="scale">
+                <input type="number" id="prescription-scale-number" min="1" max="100" placeholder="1-100">
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'X', this)">X</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'LM', this)">LM</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'Ø', this)">Ø</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Vehicle</label>
+            <div class="choice-grid" data-prescription-group="vehicle">
+                <button type="button" class="choice-btn active" onclick="selectPrescriptionOption('vehicle', 'Pills', this)">Pills</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('vehicle', 'Drops', this)">Drops</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('vehicle', 'Powder', this)">Powder</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('vehicle', 'Ointment', this)">Ointment</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Duration</label>
+            <input type="text" id="prescription-duration" placeholder="e.g., 5 Days">
+        </div>
+
+        <div class="form-group">
+            <label>Special Instructions <span style="font-size: 0.75rem; color: var(--text-dim);">(Optional)</span></label>
+            <textarea id="prescription-instructions" maxlength="500" placeholder="Enter specific patient advice, dosage timing, food instructions, etc."></textarea>
+        </div>
+
+        <button type="button" class="btn btn-primary" style="width: 100%;" onclick="savePrescriptionItem()">Save & Add to Prescription</button>
     </div>
 </div>
 
@@ -1377,6 +1488,13 @@
     let showAllActive = false;
     let editingRecordId = null;
     let editingReportLinks = [];
+    let currentPrescriptions = [];
+    let editingPrescriptionIndex = -1;
+    let currentPrescriptionDraft = {
+      potency: 'ANY',
+      scale: '',
+      vehicle: 'Pills'
+    };
     let inactivityTimer = null;
     let lastActivityTime = Date.now();
 
@@ -1609,12 +1727,168 @@
       list.innerHTML = existing.concat(selected).join('') || '<span style="color: var(--text-dim);">No reports attached</span>';
     }
 
+    function getPrescriptionMedicine(item) {
+      if (!item) return '';
+      if (typeof item === 'string') return item;
+      return item.medicine || item.medicineName || item.name || item.remedy || item.remedyName || item.drug || '';
+    }
+
+    function normalizePrescriptionItem(item) {
+      if (!item) return { medicine: '' };
+      if (typeof item === 'string') return { medicine: item };
+      return Object.assign({}, item, {
+        medicine: getPrescriptionMedicine(item),
+        vehicle: normalizePrescriptionVehicle(item.vehicle)
+      });
+    }
+
+    function prescriptionSummary(item) {
+      item = normalizePrescriptionItem(item);
+      const medicine = item.medicine || 'Medicine';
+      const scalePart = (item.scaleNumber || '') + (item.scale || '');
+      const potency = item.potency && item.potency !== 'ANY' ? ' (' + item.potency + scalePart + ')' : (scalePart ? ' (' + scalePart + ')' : '');
+      const duration = item.duration ? ' - ' + item.duration : '';
+      return medicine + potency + duration;
+    }
+
+    function normalizePrescriptionVehicle(vehicle) {
+      if (!vehicle) return '';
+      if (String(vehicle).toLowerCase().indexOf('pills') !== -1) return 'Pills';
+      return vehicle;
+    }
+
+    function renderPrescriptions() {
+      const list = document.getElementById('prescription-list');
+      if (!list) return;
+      if (!currentPrescriptions.length) {
+        list.innerHTML = '<span style="color: var(--text-dim);">No prescriptions added</span>';
+        return;
+      }
+      currentPrescriptions = currentPrescriptions.map(normalizePrescriptionItem);
+      list.innerHTML = currentPrescriptions.map(function(item, index) {
+        return `
+          <div class="prescription-item">
+            <span onclick="openPrescriptionModal(${index})" style="cursor: pointer; flex: 1;">${escapeHtml(prescriptionSummary(item))}</span>
+            <button type="button" class="btn btn-secondary btn-small" onclick="removePrescriptionItem(${index})">Delete</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function removePrescriptionItem(index) {
+      currentPrescriptions.splice(index, 1);
+      renderPrescriptions();
+    }
+
+    function resetPrescriptionModal() {
+      currentPrescriptionDraft = {
+        potency: 'ANY',
+        scale: '',
+        vehicle: 'Pills'
+      };
+      editingPrescriptionIndex = -1;
+      document.getElementById('prescription-medicine').value = '';
+      document.getElementById('prescription-potency').value = 'ANY';
+      document.getElementById('prescription-scale-number').value = '';
+      document.getElementById('prescription-duration').value = '';
+      document.getElementById('prescription-instructions').value = '';
+      document.querySelectorAll('[data-prescription-group] .choice-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      document.querySelector('[data-prescription-group="potency"] .choice-btn').classList.add('active');
+      document.querySelector('[data-prescription-group="vehicle"] .choice-btn').classList.add('active');
+    }
+
+    function setPrescriptionChoice(group, value) {
+      const wrapper = document.querySelector('[data-prescription-group="' + group + '"]');
+      if (!wrapper) return;
+      wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+        const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'" + value + "'") !== -1;
+        btn.classList.toggle('active', isActive);
+      });
+    }
+
+    function openPrescriptionModal(index) {
+      resetPrescriptionModal();
+      if (typeof index === 'number' && index >= 0 && index < currentPrescriptions.length) {
+        const item = normalizePrescriptionItem(currentPrescriptions[index]);
+        currentPrescriptions[index] = item;
+        editingPrescriptionIndex = index;
+        currentPrescriptionDraft = {
+          potency: item.potency || 'ANY',
+          scale: item.scale || '',
+          vehicle: normalizePrescriptionVehicle(item.vehicle) || 'Pills'
+        };
+        document.getElementById('prescription-medicine').value = getPrescriptionMedicine(item);
+        document.getElementById('prescription-potency').value = item.potency || 'ANY';
+        document.getElementById('prescription-scale-number').value = item.scaleNumber || '';
+        document.getElementById('prescription-duration').value = item.duration || '';
+        document.getElementById('prescription-instructions').value = item.instructions || '';
+        setPrescriptionChoice('potency', item.potency || 'ANY');
+        if (item.scale) setPrescriptionChoice('scale', item.scale);
+      setPrescriptionChoice('vehicle', normalizePrescriptionVehicle(item.vehicle) || 'Pills');
+      }
+      document.getElementById('prescription-modal').classList.add('show');
+    }
+
+    function closePrescriptionModal() {
+      document.getElementById('prescription-modal').classList.remove('show');
+    }
+
+    function selectPrescriptionOption(group, value, button) {
+      currentPrescriptionDraft[group] = value;
+      if (group === 'potency') {
+        document.getElementById('prescription-potency').value = value;
+      }
+      const wrapper = button.closest('[data-prescription-group]');
+      wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      button.classList.add('active');
+    }
+
+    function savePrescriptionItem() {
+      const existingItem = editingPrescriptionIndex >= 0 ? normalizePrescriptionItem(currentPrescriptions[editingPrescriptionIndex]) : null;
+      const medicine = document.getElementById('prescription-medicine').value.trim() || getPrescriptionMedicine(existingItem);
+      const potency = document.getElementById('prescription-potency').value.trim() || currentPrescriptionDraft.potency || 'ANY';
+      const scaleNumberRaw = document.getElementById('prescription-scale-number').value.trim();
+      const scaleNumber = scaleNumberRaw ? Math.max(1, Math.min(100, parseInt(scaleNumberRaw, 10) || 1)) : '';
+      const duration = document.getElementById('prescription-duration').value.trim();
+      const instructions = document.getElementById('prescription-instructions').value.trim();
+      if (!medicine) {
+        showWarningMessage('Please enter medicine name for prescription');
+        alert('Please enter medicine name for prescription');
+        return;
+      }
+      const item = {
+        medicine: medicine,
+        potency: potency,
+        scaleNumber: scaleNumber,
+        scale: currentPrescriptionDraft.scale || '',
+        vehicle: normalizePrescriptionVehicle(currentPrescriptionDraft.vehicle) || 'Pills',
+        duration: duration,
+        instructions: instructions,
+        createdAt: new Date().toISOString()
+      };
+      if (editingPrescriptionIndex >= 0) {
+        item.createdAt = existingItem.createdAt || item.createdAt;
+        item.updatedAt = new Date().toISOString();
+        currentPrescriptions[editingPrescriptionIndex] = item;
+      } else {
+        currentPrescriptions.push(item);
+      }
+      renderPrescriptions();
+      closePrescriptionModal();
+    }
+
     function showAddForm() {
       editingRecordId = null;
       editingReportLinks = [];
+      currentPrescriptions = [];
       document.getElementById('modal-title').textContent = 'Add Patient Record';
       document.getElementById('patient-form').reset();
       renderSelectedReports([]);
+      renderPrescriptions();
       document.getElementById('patient-modal').classList.add('show');
     }
 
@@ -1629,8 +1903,10 @@
       document.getElementById('date-of-visit').value = record.dateOfVisit;
       document.getElementById('diagnosis').value = record.diagnosis;
       document.getElementById('medicines').value = record.medicines || '';
+      currentPrescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(normalizePrescriptionItem) : [];
       editingReportLinks = Array.isArray(record.reportLinks) ? record.reportLinks.slice() : [];
       document.getElementById('report-files').value = '';
+      renderPrescriptions();
       renderSelectedReports(editingReportLinks);
       document.getElementById('patient-modal').classList.add('show');
     }
@@ -1639,6 +1915,7 @@
       document.getElementById('patient-modal').classList.remove('show');
       editingRecordId = null;
       editingReportLinks = [];
+      currentPrescriptions = [];
       stopVoiceInput();
     }
 
@@ -2032,6 +2309,7 @@
         diagnosis: diagnosis,
         medicines: medicines || '',
         status: status,
+        prescriptions: currentPrescriptions.slice(),
         reportLinks: reportLinks,
         timestamp: new Date().toISOString()
       };
@@ -2150,6 +2428,23 @@
         </div>
       `).join('');
 
+      const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(normalizePrescriptionItem) : [];
+      const prescriptionsHtml = `
+        <div class="detail-field">
+          <span class="detail-field-label">Prescription</span>
+          <span class="detail-field-value">
+            ${prescriptions.length ? prescriptions.map(function(item) {
+              const meta = [
+                item.potency ? 'Potency: ' + item.potency + (item.scaleNumber || '') + (item.scale || '') : '',
+                normalizePrescriptionVehicle(item.vehicle),
+                item.duration ? 'Duration: ' + item.duration : ''
+              ].filter(Boolean).join(' | ');
+              return '<div class="prescription-item"><span><strong>' + escapeHtml(getPrescriptionMedicine(item) || 'Medicine') + '</strong><br>' + escapeHtml(meta) + (item.instructions ? '<br>' + escapeHtml(item.instructions) : '') + '</span></div>';
+            }).join('') : 'No prescriptions added'}
+          </span>
+        </div>
+      `;
+
       const reports = Array.isArray(record.reportLinks) ? record.reportLinks : [];
       const reportsHtml = `
         <div class="detail-field">
@@ -2163,7 +2458,7 @@
         </div>
       `;
 
-      document.getElementById('detail-body').innerHTML = fieldsHtml + reportsHtml;
+      document.getElementById('detail-body').innerHTML = fieldsHtml + prescriptionsHtml + reportsHtml;
 
       document.getElementById('detail-edit-btn').onclick = () => {
         closeDetailModal();
