@@ -873,6 +873,7 @@
     </div>
 </div>
 
+<script src="homeopathic-medicines.js"></script>
 <script>
     // Storage adapters
     const storage = {
@@ -2526,7 +2527,7 @@
       { name: "Pharyngitis", category: "Respiratory" }
     ];
 
-    const commonMedicines = [
+    const allopathicMedicines = [
       { name: "Paracetamol", category: "Allopathic - analgesic/antipyretic" },
       { name: "Ibuprofen", category: "Allopathic - NSAID" },
       { name: "Amoxicillin", category: "Allopathic - antibiotic" },
@@ -2551,23 +2552,9 @@
       { name: "Ondansetron", category: "Allopathic - antiemetic" },
       { name: "Domperidone", category: "Allopathic - antiemetic" },
       { name: "Doxycycline", category: "Allopathic - antibiotic" },
-      { name: "Ciprofloxacin", category: "Allopathic - antibiotic" },
-      { name: "Arnica montana", category: "Homeopathic" },
-      { name: "Nux vomica", category: "Homeopathic" },
-      { name: "Belladonna", category: "Homeopathic" },
-      { name: "Rhus toxicodendron", category: "Homeopathic" },
-      { name: "Bryonia alba", category: "Homeopathic" },
-      { name: "Pulsatilla", category: "Homeopathic" },
-      { name: "Aconitum napellus", category: "Homeopathic" },
-      { name: "Gelsemium", category: "Homeopathic" },
-      { name: "Hepar sulphuris", category: "Homeopathic" },
-      { name: "Calcarea carbonica", category: "Homeopathic" },
-      { name: "Sulphur", category: "Homeopathic" },
-      { name: "Silicea", category: "Homeopathic" },
-      { name: "Mercurius solubilis", category: "Homeopathic" },
-      { name: "Apis mellifica", category: "Homeopathic" },
-      { name: "Phosphorus", category: "Homeopathic" }
+      { name: "Ciprofloxacin", category: "Allopathic - antibiotic" }
     ];
+    const commonMedicines = allopathicMedicines.concat(window.HOMEOPATHIC_MEDICINES || []);
 
     // Autocomplete functionality
     let selectedSuggestionIndex = -1;
@@ -2581,6 +2568,7 @@
     const medicineSuggestionCache = {};
     const CONDITIONS_API_URL = 'https://clinicaltables.nlm.nih.gov/api/conditions/v3/search';
     const RXTERMS_API_URL = 'https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search';
+    const DAILYMED_DRUGNAMES_API_URL = 'https://dailymed.nlm.nih.gov/dailymed/services/v2/drugnames.json';
 
     function showSuggestions(fieldId, suggestions) {
       const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
@@ -2776,7 +2764,7 @@
         maxList: '8'
       });
       const response = await fetch(RXTERMS_API_URL + '?' + params.toString(), { signal: signal });
-      if (!response.ok) throw new Error('Medicine lookup failed');
+      if (!response.ok) throw new Error('RxTerms lookup failed');
 
       const data = await response.json();
       const displayRows = Array.isArray(data[3]) ? data[3] : [];
@@ -2792,6 +2780,48 @@
 
       medicineSuggestionCache[cacheKey] = suggestions;
       return suggestions;
+    }
+
+    function toTitleCase(value) {
+      return String(value || '').toLowerCase().replace(/\b[a-z]/g, function(ch) {
+        return ch.toUpperCase();
+      });
+    }
+
+    function cleanDailyMedDrugName(value) {
+      let name = String(value || '').trim();
+      if (!name) return '';
+
+      name = name.split(' | ')[0];
+      name = name.split(';')[0];
+      name = name.replace(/\s+/g, ' ');
+      name = name.replace(/\s+(pellet|tablet|liquid|globule|cream|ointment|gel|spray|drop|solution|oral|sublingual).*$/i, '');
+      return toTitleCase(name);
+    }
+
+    async function fetchDailyMedMedicineSuggestions(query, signal) {
+      const params = new URLSearchParams({
+        drug_name: query,
+        name_type: 'both',
+        pagesize: '25',
+        page: '1'
+      });
+      const response = await fetch(DAILYMED_DRUGNAMES_API_URL + '?' + params.toString(), { signal: signal });
+      if (!response.ok) throw new Error('DailyMed lookup failed');
+
+      const data = await response.json();
+      const rows = Array.isArray(data.data) ? data.data : [];
+      const normalizedQuery = query.toLowerCase();
+      return rows.map(function(row) {
+        return cleanDailyMedDrugName(row.drug_name);
+      }).filter(function(name) {
+        return name && name.toLowerCase().includes(normalizedQuery);
+      }).map(function(name) {
+        return {
+          name: name,
+          category: 'Online medicine label'
+        };
+      });
     }
 
     async function refreshDiagnosisSuggestions(query) {
@@ -2825,10 +2855,15 @@
 
       try {
         medicineSuggestController = new AbortController();
-        const onlineMatches = await fetchOnlineMedicineSuggestions(query, medicineSuggestController.signal);
+        const onlineResults = await Promise.allSettled([
+          fetchOnlineMedicineSuggestions(query, medicineSuggestController.signal),
+          fetchDailyMedMedicineSuggestions(query, medicineSuggestController.signal)
+        ]);
+        const rxTermsMatches = onlineResults[0].status === 'fulfilled' ? onlineResults[0].value : [];
+        const dailyMedMatches = onlineResults[1].status === 'fulfilled' ? onlineResults[1].value : [];
         const field = document.getElementById('medicines');
         if (!field || getCurrentMedicineSegment(field).query !== query) return;
-        showSuggestions('medicines', mergeSuggestions(onlineMatches, localMatches).slice(0, 8));
+        showSuggestions('medicines', mergeSuggestions(localMatches, rxTermsMatches, dailyMedMatches).slice(0, 8));
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.warn('Online medicine lookup failed:', error);
