@@ -808,7 +808,10 @@
 
         <div class="form-group">
             <label>Medicine Name</label>
-            <input type="text" id="prescription-medicine" placeholder="Enter medicine/remedy name">
+            <div class="autocomplete-container">
+                <input type="text" id="prescription-medicine" placeholder="Enter medicine/remedy name">
+                <div id="prescription-medicine-suggestions" class="autocomplete-suggestions"></div>
+            </div>
         </div>
 
         <div class="form-group">
@@ -1593,6 +1596,7 @@
       // Initialize autocomplete for diagnosis and medicines
       handleAutocomplete('diagnosis', commonDiagnoses);
       handleAutocomplete('medicines', commonMedicines);
+      handleAutocomplete('prescription-medicine', commonMedicines);
 
       if (!GoogleDriveSync.isSignedIn()) {
         setTimeout(() => {
@@ -2601,6 +2605,10 @@
       return field.value.trim();
     }
 
+    function isMedicineAutocompleteField(fieldId) {
+      return fieldId === 'medicines' || fieldId === 'prescription-medicine';
+    }
+
     function highlightMatch(text, query) {
       const safeText = escapeHtml(text || '');
       if (!query) return safeText;
@@ -2845,13 +2853,14 @@
       }
     }
 
-    async function refreshMedicineSuggestions(query) {
+    async function refreshMedicineSuggestions(query, fieldId) {
+      fieldId = fieldId || 'medicines';
       if (!query || query.length < 2) return;
       if (medicineSuggestTimer) clearTimeout(medicineSuggestTimer);
       if (medicineSuggestController) medicineSuggestController.abort();
 
       const localMatches = getLocalDiagnosisSuggestions(query, commonMedicines);
-      showSuggestions('medicines', localMatches);
+      showSuggestions(fieldId, localMatches);
 
       try {
         medicineSuggestController = new AbortController();
@@ -2861,9 +2870,13 @@
         ]);
         const rxTermsMatches = onlineResults[0].status === 'fulfilled' ? onlineResults[0].value : [];
         const dailyMedMatches = onlineResults[1].status === 'fulfilled' ? onlineResults[1].value : [];
-        const field = document.getElementById('medicines');
-        if (!field || getCurrentMedicineSegment(field).query !== query) return;
-        showSuggestions('medicines', mergeSuggestions(localMatches, rxTermsMatches, dailyMedMatches).slice(0, 8));
+        const field = document.getElementById(fieldId);
+        if (!field) return;
+        const currentQuery = fieldId === 'medicines'
+          ? getCurrentMedicineSegment(field).query
+          : field.value.trim();
+        if (currentQuery !== query) return;
+        showSuggestions(fieldId, mergeSuggestions(localMatches, rxTermsMatches, dailyMedMatches).slice(0, 8));
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.warn('Online medicine lookup failed:', error);
@@ -2922,9 +2935,9 @@
           return;
         }
 
-        if (fieldId === 'medicines') {
+        if (isMedicineAutocompleteField(fieldId)) {
           medicineSuggestTimer = setTimeout(async function() {
-            refreshMedicineSuggestions(query);
+            refreshMedicineSuggestions(query, fieldId);
           }, 350);
           const localMatches = getLocalDiagnosisSuggestions(query, dataList);
           showSuggestions(fieldId, localMatches);
@@ -3022,6 +3035,7 @@
         bindVoiceButtons();
         handleAutocomplete('diagnosis', commonDiagnoses);
         handleAutocomplete('medicines', commonMedicines);
+        handleAutocomplete('prescription-medicine', commonMedicines);
         resetInactivityTimer();
 
         updateSyncStatus('offline', 'Checking connection...');
