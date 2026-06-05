@@ -10,6 +10,7 @@ local.properties
 .idea/usage.statistics.xml
 .idea/dictionaries/
 .idea/shelf/
+.idea/caches/
 
 # Android Studio generated files
 captures/
