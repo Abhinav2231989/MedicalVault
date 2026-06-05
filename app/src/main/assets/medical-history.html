@@ -14,6 +14,26 @@
           -webkit-tap-highlight-color: transparent;
         }
 
+        /* Custom scrollbars for a premium dark mode look */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(46, 82, 102, 0.6);
+          border-radius: 4px;
+          border: 2px solid var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 168, 168, 0.5);
+        }
+
         :root {
           --primary: #00a8a8;
           --primary-dark: #007f7f;
@@ -451,11 +471,27 @@
 
         .voice-btn:hover {
           background: var(--primary-dark);
+          transform: translateY(-50%) scale(1.05);
         }
 
         .voice-btn.listening {
-          background: var(--secondary);
-          animation: pulse 1s infinite;
+          background: #ff4a4a;
+          box-shadow: 0 0 0 0 rgba(255, 74, 74, 0.7);
+          animation: voiceRipple 1.2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+
+        @keyframes voiceRipple {
+          0% {
+            transform: translateY(-50%) scale(1);
+            box-shadow: 0 0 0 0 rgba(255, 74, 74, 0.7);
+          }
+          50% {
+            transform: translateY(-50%) scale(1.08);
+          }
+          100% {
+            transform: translateY(-50%) scale(1);
+            box-shadow: 0 0 0 12px rgba(255, 74, 74, 0);
+          }
         }
 
         .input-with-voice {
@@ -474,7 +510,9 @@
           left: 0;
           width: 100%;
           height: 100%;
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(10, 25, 41, 0.6);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           z-index: 1000;
           overflow-y: auto;
           padding: 1rem;
@@ -487,15 +525,29 @@
         }
 
         .modal-content {
-          background: var(--bg-card);
+          background: rgba(26, 58, 82, 0.85);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           padding: 2rem;
-          border-radius: 12px;
-          border: 1px solid var(--border);
+          border-radius: 16px;
+          border: 1px solid rgba(0, 168, 168, 0.2);
           max-width: 600px;
           width: 100%;
           max-height: 90vh;
           overflow-y: auto;
-          animation: fadeSlideUp 0.3s ease;
+          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+          animation: modalFadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalFadeSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
 
         .modal-header {
@@ -512,15 +564,27 @@
         }
 
         .close-btn {
-          background: none;
-          border: none;
-          color: var(--text);
-          font-size: 2rem;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-dim);
+          font-size: 1.25rem;
           cursor: pointer;
           line-height: 1;
           padding: 0;
           width: 32px;
           height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+          background: var(--secondary);
+          color: white;
+          border-color: var(--secondary);
+          transform: rotate(90deg);
         }
 
         table {
@@ -639,29 +703,208 @@
         }
 
         @media (max-width: 768px) {
-          table {
+          /* Hide table headers */
+          table thead {
+            display: none;
+          }
+          
+          table, tbody, tr, td {
+            display: block;
+            width: 100%;
+          }
+
+          /* Style each table row as a beautiful card */
+          tr.record-row {
+            background: rgba(19, 47, 76, 0.4);
+            border: 1px solid rgba(46, 82, 102, 0.8);
+            border-radius: 16px;
+            padding: 1.25rem 1rem;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 0.4rem 0.9rem;
+            align-items: center;
+            position: relative;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+          }
+
+          tr.record-row:active {
+            transform: scale(0.99);
+            border-color: #00f2fe;
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.15);
+          }
+
+          /* Column 1: Icon Badge */
+          tr.record-row td:nth-child(1) {
+            grid-column: 1;
+            grid-row: 1 / span 3;
+            padding: 0;
+            margin: 0;
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.1), rgba(79, 172, 254, 0.15)) !important;
+            border-radius: 12px;
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(0, 242, 254, 0.3) !important;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+          }
+
+          /* Column 2: Patient Name */
+          tr.record-row td:nth-child(2) {
+            grid-column: 2;
+            grid-row: 1;
+            font-family: 'Syne', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #ffffff;
+            padding: 0;
+            text-align: left;
+            border-bottom: none;
+            letter-spacing: -0.5px;
+          }
+
+          /* Column 3: Phone Number */
+          tr.record-row td:nth-child(3) {
+            grid-column: 2;
+            grid-row: 2;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            padding: 0;
+            text-align: left;
+            border-bottom: none;
+            opacity: 0.95;
+            display: flex;
+            align-items: center;
+          }
+          tr.record-row td:nth-child(3)::before {
+            content: '📞';
             font-size: 0.75rem;
+            margin-right: 0.35rem;
+            opacity: 0.8;
           }
 
-          th, td {
-            padding: 0.75rem 0.5rem;
+          /* Column 4: Date of Visit */
+          tr.record-row td:nth-child(4) {
+            grid-column: 2;
+            grid-row: 3;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            padding: 0;
+            text-align: left;
+            border-bottom: none;
+            opacity: 0.95;
+            display: flex;
+            align-items: center;
+          }
+          tr.record-row td:nth-child(4)::before {
+            content: '📅';
+            font-size: 0.75rem;
+            margin-right: 0.35rem;
+            opacity: 0.8;
           }
 
-          th {
-            font-size: 0.65rem;
+          /* Column 5: Status Badge (Fixed positioning & overlapping) */
+          tr.record-row td:nth-child(5) {
+            position: absolute;
+            top: 1.25rem;
+            right: 1rem;
+            padding: 0;
+            width: auto !important;
+            border-bottom: none;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
           }
 
+          tr.record-row td:nth-child(5) span {
+            border-radius: 20px !important;
+            padding: 0.2rem 0.65rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            font-size: 0.6rem !important;
+            letter-spacing: 0.75px !important;
+            border: 1px solid currentColor !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+            display: inline-block !important;
+          }
+
+          /* Column 6: Actions Cell */
+          tr.record-row td:nth-child(6) {
+            grid-column: 1 / span 2;
+            grid-row: 4;
+            padding-top: 0.85rem;
+            border-top: 1px solid rgba(46, 82, 102, 0.4);
+            margin-top: 0.5rem;
+            display: flex;
+            justify-content: flex-end;
+            border-bottom: none;
+          }
+
+          .actions-cell {
+            flex-direction: row !important;
+            justify-content: flex-end;
+            width: 100%;
+            gap: 0.65rem;
+          }
+
+          .actions-cell .btn {
+            width: 34px !important;
+            height: 34px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 8px !important;
+            font-size: 0.95rem !important;
+            transition: all 0.2s ease !important;
+          }
+
+          .actions-cell .btn-primary {
+            background: rgba(0, 242, 254, 0.1) !important;
+            color: #00f2fe !important;
+            border: 1px solid rgba(0, 242, 254, 0.3) !important;
+          }
+
+          .actions-cell .btn-primary:active {
+            background: #00f2fe !important;
+            color: #0a1929 !important;
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.4) !important;
+            transform: scale(0.95) !important;
+          }
+
+          .actions-cell .btn-secondary {
+            background: rgba(255, 107, 107, 0.1) !important;
+            color: #ff6b6b !important;
+            border: 1px solid rgba(255, 107, 107, 0.3) !important;
+          }
+
+          .actions-cell .btn-secondary:active {
+            background: #ff6b6b !important;
+            color: #0a1929 !important;
+            box-shadow: 0 0 10px rgba(255, 107, 107, 0.4) !important;
+            transform: scale(0.95) !important;
+          }
+
+          /* Form & Autocomplete fields stacking */
           .search-box {
             flex-direction: column;
+            gap: 0.75rem !important;
           }
 
           .search-box input,
           .search-box button {
             width: 100%;
+            margin-right: 0 !important;
           }
 
-          .actions-cell {
-            flex-direction: column;
+          .search-box button {
+            padding: 0.75rem 1rem;
           }
         }
 
@@ -1108,6 +1351,7 @@
     var _pendingReportUpload = null;
     var _lastUploadMeta = null;
     var _lastUploadPendingCount = 0;
+    var _isUploadingReports = false;
 
     // Stable device ID so each phone can identify itself in the lock field
     function _getDeviceId() {
@@ -1554,12 +1798,12 @@
           syncMeta: syncMeta,
           syncHistory: nextSyncHistory,
           // Distributed lock — held for _LOCK_TTL ms so other devices wait
-          syncLock: {
+          syncLock: _isUploadingReports ? {
             holder: _deviceId,
             holderName: syncMeta.user,
             holderDevice: syncMeta.deviceName,
             acquiredAt: Date.now()
-          }
+          } : null
         };
 
         const dataJson = JSON.stringify(allData);
@@ -2393,6 +2637,7 @@
 
       try {
         updateSyncStatus('syncing', 'Deleting report from Google Drive...');
+        _isUploadingReports = true;
         GoogleDriveSync.uploadData();
         await deleteReportFromDrive(report.id);
         editingReportLinks.splice(index, 1);
@@ -2407,11 +2652,15 @@
           records[recordIndex].timestamp = new Date().toISOString();
           await saveData('patient-records', records);
           await markPendingSync();
+          _isUploadingReports = false;
           scheduleAutoSync();
+        } else {
+          _isUploadingReports = false;
         }
 
         showSuccessMessage('Report deleted successfully');
       } catch (error) {
+        _isUploadingReports = false;
         console.error('Report delete error:', error);
         showWarningMessage(error.message || 'Report delete failed');
       }
@@ -2571,25 +2820,34 @@
         }
 
         updateSyncStatus('syncing', 'Locking sync and uploading reports...');
+        _isUploadingReports = true;
         GoogleDriveSync.uploadData();
         const uploadedReports = await uploadSelectedReports(patientId);
-        if (!uploadedReports.length) return;
+        if (!uploadedReports.length) {
+          _isUploadingReports = false;
+          return;
+        }
 
         const records = await loadData('patient-records');
         const index = records.findIndex(function(record) {
           return String(record.id) === String(recordId);
         });
-        if (index === -1) return;
+        if (index === -1) {
+          _isUploadingReports = false;
+          return;
+        }
 
         const existing = Array.isArray(records[index].reportLinks) ? records[index].reportLinks : [];
         records[index].reportLinks = existing.concat(uploadedReports);
         records[index].timestamp = new Date().toISOString();
         await saveData('patient-records', records);
         await markPendingSync();
+        _isUploadingReports = false;
         showSuccessMessage('Report upload complete: ' + fileCount + ' file(s)');
         loadRecords();
         scheduleAutoSync();
       } catch (error) {
+        _isUploadingReports = false;
         console.error('Report upload error:', error);
         if (error.message === 'DRIVE_SIGN_IN_REQUIRED') {
           _pendingReportUpload = {
@@ -2698,6 +2956,11 @@
       } else if (showAllActive) {
         const sorted = [...allRecords].sort((a, b) => new Date(b.dateOfVisit) - new Date(a.dateOfVisit));
         records = sorted.slice(0, 100);
+        if (allRecords.length <= 100) {
+          notice.innerHTML = `ℹ️ Showing last ${allRecords.length} records.`;
+        } else {
+          notice.innerHTML = `ℹ️ Showing last 100 records, please use the search functionality.`;
+        }
         notice.style.display = 'block';
       } else {
         records = allRecords.filter(r => isWithinLast15Days(r.dateOfVisit));
