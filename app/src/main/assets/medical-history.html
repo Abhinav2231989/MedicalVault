@@ -46,42 +46,136 @@
         }
 
         header {
-          text-align: center;
           margin-bottom: 1.5rem;
-          padding: 1.5rem 0;
-          border-bottom: 2px solid var(--border);
+          padding: 1.5rem 0 1rem 0;
+          border-bottom: 1px solid rgba(46, 82, 102, 0.5);
           position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .header-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          width: 100%;
+          gap: 1rem;
+        }
+
+        .brand-section {
+          text-align: left;
         }
 
         h1 {
           font-family: 'Syne', sans-serif;
           font-size: 2rem;
           font-weight: 700;
-          letter-spacing: -2px;
-          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          letter-spacing: -1.5px;
+          background: linear-gradient(135deg, #00f2fe, #4facfe);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.2rem;
           animation: slideDown 0.6s ease;
         }
 
         .subtitle {
-          font-size: 0.75rem;
+          font-size: 0.65rem;
           color: var(--text-dim);
           text-transform: uppercase;
           letter-spacing: 2px;
+          font-weight: 500;
+          opacity: 0.8;
           animation: fadeIn 0.8s ease 0.2s both;
+        }
+
+        .header-meta {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.5rem;
+        }
+
+        #user-info {
+          font-size: 0.75rem;
+          color: #a0d2eb;
+          background: rgba(19, 47, 76, 0.6);
+          padding: 0.35rem 0.75rem;
+          border-radius: 20px;
+          border: 1px solid rgba(46, 82, 102, 0.4);
+          font-weight: 500;
+          letter-spacing: 0.5px;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+        }
+
+        #user-info:empty {
+          display: none;
+        }
+        
+        #user-info::before {
+          content: '👤';
+          font-size: 0.7rem;
+        }
+
+        .btn-logout {
+          background: rgba(255, 107, 107, 0.1);
+          color: var(--secondary);
+          border: 1px solid rgba(255, 107, 107, 0.4);
+          padding: 0.4rem 0.8rem;
+          font-size: 0.7rem;
+          border-radius: 6px;
+          font-family: 'Syne', sans-serif;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+        }
+
+        .btn-logout:hover, .btn-logout:active {
+          background: var(--secondary);
+          color: white;
+          border-color: var(--secondary);
+          box-shadow: 0 0 10px rgba(255, 107, 107, 0.3);
+        }
+
+        /* Beautiful Sync Widget */
+        .sync-panel {
+          background: rgba(19, 47, 76, 0.4);
+          border: 1px solid rgba(46, 82, 102, 0.6);
+          border-radius: 12px;
+          padding: 0.75rem 1rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.15);
+          width: 100%;
+        }
+
+        .sync-info {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+          flex: 1;
+          min-width: 0;
         }
 
         .sync-status {
           display: flex;
           align-items: center;
-          justify-content: center;
           gap: 0.5rem;
-          margin-top: 0.5rem;
-          font-size: 0.7rem;
-          color: var(--text-dim);
+          font-size: 0.8rem;
+          font-weight: 500;
+          color: var(--text);
         }
 
         .sync-indicator {
@@ -89,24 +183,94 @@
           height: 8px;
           border-radius: 50%;
           background: var(--text-dim);
+          display: inline-block;
+          flex-shrink: 0;
+          box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
         }
 
         .sync-indicator.synced {
           background: var(--success);
+          box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
         }
 
         .sync-indicator.syncing {
           background: var(--warning);
+          box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
           animation: pulse 1s infinite;
         }
 
         .sync-indicator.offline {
           background: var(--secondary);
+          box-shadow: 0 0 8px rgba(255, 107, 107, 0.5);
+        }
+
+        .sync-details {
+          font-size: 0.65rem;
+          color: var(--text-dim);
+          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .btn-sync {
+          background: linear-gradient(135deg, #00b4db, #0083b0);
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+          border-radius: 20px;
+          font-family: 'Syne', sans-serif;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          flex-shrink: 0;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(0, 131, 176, 0.3);
+        }
+
+        .btn-sync:hover, .btn-sync:active {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 131, 176, 0.5);
+          filter: brightness(1.1);
+        }
+
+        .btn-sync:active {
+          transform: translateY(1px);
         }
 
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 480px) {
+          .header-top {
+            flex-direction: row;
+            align-items: center;
+          }
+          h1 {
+            font-size: 1.75rem;
+          }
+          .sync-panel {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+            text-align: center;
+          }
+          .sync-status {
+            justify-content: center;
+          }
+          .sync-details {
+            white-space: normal;
+          }
+          .btn-sync {
+            justify-content: center;
+          }
         }
 
         .login-container {
@@ -668,20 +832,31 @@
 <!-- Main App -->
 <div class="container" id="main-app" style="display: none;">
     <header>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="flex: 1;">
+        <div class="header-top">
+            <div class="brand-section">
                 <h1>MedVault</h1>
                 <p class="subtitle">Patient Records System</p>
             </div>
-            <button class="btn btn-secondary btn-small" onclick="logout()">Logout</button>
+            <div class="header-meta">
+                <div id="user-info"></div>
+                <button class="btn-logout" onclick="logout()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    Logout
+                </button>
+            </div>
         </div>
-        <div id="user-info" style="text-align: center; color: var(--text-dim); font-size: 0.8rem;"></div>
 
-        <div class="sync-status">
-            <span class="sync-indicator" id="sync-indicator"></span>
-            <span id="sync-text">Checking sync status...</span>
-            <button class="btn btn-success btn-small" onclick="manualSync()" id="sync-btn" style="margin-left: 0.5rem;">
-                ☁️ Sync Now
+        <div class="sync-panel">
+            <div class="sync-info">
+                <div class="sync-status">
+                    <span class="sync-indicator" id="sync-indicator"></span>
+                    <span id="sync-text">Checking sync status...</span>
+                </div>
+                <div class="sync-details" id="sync-details"></div>
+            </div>
+            <button class="btn-sync" onclick="manualSync()" id="sync-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 15.25"></path><path d="M8 16a4 4 0 0 1 8 0"></path></svg>
+                Sync Now
             </button>
         </div>
     </header>
@@ -931,6 +1106,8 @@
     var _uploadInProgress = false;
     var _LOCK_TTL = 300000; // 5 minutes — covers report upload + JSON sync
     var _pendingReportUpload = null;
+    var _lastUploadMeta = null;
+    var _lastUploadPendingCount = 0;
 
     // Stable device ID so each phone can identify itself in the lock field
     function _getDeviceId() {
@@ -951,6 +1128,120 @@
       return id;
     }
     var _deviceId = _getDeviceId();
+
+    function _getDeviceName() {
+      var name;
+      if (typeof AndroidStorage !== 'undefined') {
+        name = AndroidStorage.getItem('medvault_device_name');
+      } else {
+        name = localStorage.getItem('medvault_device_name');
+      }
+      if (!name) {
+        name = 'Phone ' + _deviceId.slice(-4).toUpperCase();
+        if (typeof AndroidStorage !== 'undefined') {
+          AndroidStorage.setItem('medvault_device_name', name);
+        } else {
+          localStorage.setItem('medvault_device_name', name);
+        }
+      }
+      return name;
+    }
+    var _deviceName = _getDeviceName();
+
+    async function _loadJsonValue(key, fallback) {
+      try {
+        const result = await window.storage.get(key);
+        return result ? JSON.parse(result.value) : fallback;
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    async function _saveJsonValue(key, value) {
+      await window.storage.set(key, JSON.stringify(value));
+    }
+
+    async function getPendingSyncCount() {
+      const count = await _loadJsonValue('medvault-pending-sync-count', 0);
+      return Math.max(0, parseInt(count, 10) || 0);
+    }
+
+    async function markPendingSync() {
+      const count = await getPendingSyncCount();
+      await _saveJsonValue('medvault-pending-sync-count', count + 1);
+      refreshSyncDetails();
+    }
+
+    async function applyUploadedPendingSync() {
+      const count = await getPendingSyncCount();
+      await _saveJsonValue('medvault-pending-sync-count', Math.max(0, count - _lastUploadPendingCount));
+      refreshSyncDetails();
+    }
+
+    function _loadSavedUserName() {
+      if (typeof AndroidStorage !== 'undefined') {
+        return AndroidStorage.getItem('medvault_user');
+      }
+      return localStorage.getItem('medvault_user');
+    }
+
+    function _syncActorName() {
+      return currentUser || _loadSavedUserName() || 'Unknown user';
+    }
+
+    function _createSyncMeta() {
+      return {
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+        user: _syncActorName(),
+        syncedAt: new Date().toISOString()
+      };
+    }
+
+    function _formatSyncMeta(meta) {
+      if (!meta || !meta.syncedAt) return '';
+      const when = new Date(meta.syncedAt).toLocaleString();
+      return 'Last cloud update: ' + (meta.user || 'Unknown user') + ' on ' + (meta.deviceName || 'Unknown phone') + ' at ' + when;
+    }
+
+    async function recordSyncHistory(syncMeta, syncHistory) {
+      const existing = Array.isArray(syncHistory) ? syncHistory : await _loadJsonValue('medvault-sync-history', []);
+      const combined = [];
+      if (syncMeta) combined.push(syncMeta);
+      existing.forEach(function(item) {
+        if (!item || !item.syncedAt) return;
+        const duplicate = combined.some(function(current) {
+          return current.syncedAt === item.syncedAt && current.deviceId === item.deviceId;
+        });
+        if (!duplicate) combined.push(item);
+      });
+      combined.sort(function(a, b) {
+        return _timeValue(b.syncedAt) - _timeValue(a.syncedAt);
+      });
+      await _saveJsonValue('medvault-sync-history', combined.slice(0, 5));
+      refreshSyncDetails();
+    }
+
+    async function refreshSyncDetails() {
+      const details = document.getElementById('sync-details');
+      const syncText = document.getElementById('sync-text');
+      const indicator = document.getElementById('sync-indicator');
+      if (!details) return;
+
+      const pendingCount = await getPendingSyncCount();
+      const history = await _loadJsonValue('medvault-sync-history', []);
+      const latest = history.length ? _formatSyncMeta(history[0]) : '';
+      const pendingText = pendingCount === 1
+        ? '1 change waiting to sync'
+        : pendingCount + ' changes waiting to sync';
+
+      const lines = [];
+      if (pendingCount > 0) lines.push(pendingText);
+      if (latest) lines.push(latest);
+      details.textContent = lines.join(' | ');
+      
+      // Removed syncText.textContent override to prevent duplicate pending sync messages
+    }
 
     function _recordKey(id) {
       return String(id);
@@ -1246,17 +1537,29 @@
         const raw = await loadData('patient-records');
         const deletedRecords = await loadData('patient-deleted-records');
         const deletionMap = _latestDeletionMap(deletedRecords);
+        _lastUploadPendingCount = await getPendingSyncCount();
         // Always strip legacy reports field — prevents OOM crash on old records
         const records = raw
           .filter(function(r) { return !_isDeletedAfterRecord(deletionMap, r); })
           .map(function(r) { const c = Object.assign({}, r); delete c.reports; return c; });
+        const syncMeta = _createSyncMeta();
+        const syncHistory = await _loadJsonValue('medvault-sync-history', []);
+        const nextSyncHistory = [syncMeta].concat(syncHistory).slice(0, 5);
+        _lastUploadMeta = syncMeta;
         const allData = {
           records: records,
           deletedRecords: _compactDeletedRecords(deletionMap),
           patientMap: await loadData('patient-id-map'),
           lastSync: new Date().toISOString(),
+          syncMeta: syncMeta,
+          syncHistory: nextSyncHistory,
           // Distributed lock — held for _LOCK_TTL ms so other devices wait
-          syncLock: { holder: _deviceId, acquiredAt: Date.now() }
+          syncLock: {
+            holder: _deviceId,
+            holderName: syncMeta.user,
+            holderDevice: syncMeta.deviceName,
+            acquiredAt: Date.now()
+          }
         };
 
         const dataJson = JSON.stringify(allData);
@@ -1288,6 +1591,7 @@
     window.onDriveReady = function(isReady) {
       if (isReady) {
         updateSyncStatus('synced', 'Google Drive connected');
+        refreshSyncDetails();
         resumePendingReportUpload();
         showSuccessMessage('✓ Connected to Google Drive');
       } else {
@@ -1295,7 +1599,7 @@
       }
     };
 
-    window.onSyncComplete = function(success, message) {
+    window.onSyncComplete = async function(success, message) {
       if (window._uploadTimeoutTimer) {
         clearTimeout(window._uploadTimeoutTimer);
         window._uploadTimeoutTimer = null;
@@ -1303,6 +1607,8 @@
       _uploadInProgress = false;
       if (success) {
         _syncRetryCount = 0;
+        await applyUploadedPendingSync();
+        await recordSyncHistory(_lastUploadMeta);
         updateSyncStatus('synced', 'Last synced: ' + new Date().toLocaleTimeString());
         showSuccessMessage('✓ Synced to Google Drive');
       } else {
@@ -1340,6 +1646,7 @@
       }
       try {
         const data = JSON.parse(dataJson);
+        recordSyncHistory(data.syncMeta, data.syncHistory);
 
         // --- Distributed lock check ---
         // If another device holds the lock and the TTL hasn't expired, wait.
@@ -1349,7 +1656,10 @@
           var lockAge = Date.now() - lock.acquiredAt;
           if (lockAge < _LOCK_TTL) {
             var waitMs = (_LOCK_TTL - lockAge) + 2000; // wait for lock to expire + 2s buffer
-            updateSyncStatus('syncing', 'Waiting for other device to finish sync...');
+            var username = lock.holderName || (data.syncMeta && data.syncMeta.user) || 'Unknown user';
+            var phoneName = lock.holderDevice || (data.syncMeta && data.syncMeta.deviceName) || lock.holder || 'Unknown phone';
+            var intervalValue = Math.max(1, Math.ceil((_LOCK_TTL - lockAge) / 60000));
+            updateSyncStatus('syncing', 'Sync pending for ' + username + ' , phone ' + phoneName + '. Try after ' + intervalValue + ' minutes.');
             // Re-download after the wait to get fresh data (and a potentially released lock)
             setTimeout(function() {
               if (typeof GoogleDrive !== 'undefined') {
@@ -1395,6 +1705,7 @@
       const localDeletedRecords = await loadData('patient-deleted-records');
       const remoteDeletedRecords = remoteData.deletedRecords || [];
       const deletionMap = _latestDeletionMap(localDeletedRecords.concat(remoteDeletedRecords));
+      var conflictCount = 0;
       const mergedRecords = localRecords.filter(function(localRecord) {
         return !_isDeletedAfterRecord(deletionMap, localRecord);
       });
@@ -1413,7 +1724,12 @@
         if (existingIndex === -1) {
           mergedRecords.push(remoteRecord);
         } else {
-          if (new Date(remoteRecord.timestamp) > new Date(mergedRecords[existingIndex].timestamp)) {
+          var remoteTime = _timeValue(remoteRecord.timestamp);
+          var localTime = _timeValue(mergedRecords[existingIndex].timestamp);
+          if (remoteTime !== localTime) {
+            conflictCount++;
+          }
+          if (remoteTime > localTime) {
             mergedRecords[existingIndex] = remoteRecord;
           }
         }
@@ -1425,6 +1741,13 @@
       if (remoteData.patientMap) {
         await saveData('patient-id-map', remoteData.patientMap);
       }
+
+      if (conflictCount > 0) {
+        const conflictText = conflictCount === 1
+          ? 'This record was also edited on another phone. Newer version kept.'
+          : conflictCount + ' records were also edited on another phone. Newer versions kept.';
+        showWarningMessage(conflictText);
+      }
     }
 
     function updateSyncStatus(status, text) {
@@ -1432,6 +1755,7 @@
       const syncText = document.getElementById('sync-text');
       indicator.className = 'sync-indicator ' + status;
       syncText.textContent = text;
+      refreshSyncDetails();
     }
 
     // triggerSync: download first so Android caches the Drive file ID,
@@ -1452,6 +1776,7 @@
     function scheduleAutoSync() {
       if (!GoogleDriveSync.isSignedIn()) {
         updateSyncStatus('offline', 'Working offline - Click to sync');
+        refreshSyncDetails();
         return;
       }
       if (window._autoSyncTimer) clearTimeout(window._autoSyncTimer);
@@ -1610,6 +1935,7 @@
 
       loadRecords();
       updatePatientNameSuggestions();
+      refreshSyncDetails();
       resetInactivityTimer();
 
       if (GoogleDriveSync.isSignedIn()) {
@@ -2080,6 +2406,7 @@
           records[recordIndex].reportLinks = editingReportLinks.slice();
           records[recordIndex].timestamp = new Date().toISOString();
           await saveData('patient-records', records);
+          await markPendingSync();
           scheduleAutoSync();
         }
 
@@ -2258,6 +2585,7 @@
         records[index].reportLinks = existing.concat(uploadedReports);
         records[index].timestamp = new Date().toISOString();
         await saveData('patient-records', records);
+        await markPendingSync();
         showSuccessMessage('Report upload complete: ' + fileCount + ' file(s)');
         loadRecords();
         scheduleAutoSync();
@@ -2332,6 +2660,7 @@
       }
 
       await saveData('patient-records', records);
+      await markPendingSync();
       await updatePatientNameSuggestions();
       closeModal();
 
@@ -2480,6 +2809,7 @@
     async function deleteRecord(id) {
       if (confirm('Are you sure you want to delete this record?')) {
         await deleteData('patient-records', id);
+        await markPendingSync();
         showSuccessMessage('✓ Record deleted successfully!');
         loadRecords();
 
@@ -3037,12 +3367,14 @@
         handleAutocomplete('medicines', commonMedicines);
         handleAutocomplete('prescription-medicine', commonMedicines);
         resetInactivityTimer();
+        refreshSyncDetails();
 
         updateSyncStatus('offline', 'Checking connection...');
         // Run migration first, then load — ensures no legacy image data in memory
         migrateRemoveReports().then(() => {
           loadRecords();
           updatePatientNameSuggestions();
+          refreshSyncDetails();
         });
 
         setTimeout(() => {
