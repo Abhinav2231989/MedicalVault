@@ -2,14 +2,23 @@ package com.medvault.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
+import android.provider.MediaStore
 import android.util.Base64
 import android.webkit.*
 import android.widget.Toast
@@ -34,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File as JavaFile
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -133,6 +143,11 @@ class MainActivity : AppCompatActivity() {
         // Set WebView client
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val uri = request?.url ?: return false
+                if (uri.scheme == "tel") {
+                    openDialer(uri)
+                    return true
+                }
                 return false
             }
 
@@ -196,6 +211,15 @@ class MainActivity : AppCompatActivity() {
 
         // Load the HTML file
         webView.loadUrl("file:///android_asset/medical-history.html")
+    }
+
+    private fun openDialer(uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_DIAL, uri)
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Cannot open phone dialer", Toast.LENGTH_SHORT).show()
+        }
     }
 
     // Handle file chooser result
@@ -365,6 +389,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        @JavascriptInterface
+        fun exportPdf(fileName: String, payloadJson: String) {
+            runOnUiThread {
+                exportPrescriptionPdf(fileName, payloadJson)
+            }
+        }
     }
 
     inner class AndroidStorage {
@@ -389,6 +420,227 @@ class MainActivity : AppCompatActivity() {
                 .remove(key)
                 .apply()
         }
+    }
+
+    private data class PdfOutput(
+        val uri: Uri,
+        val descriptor: ParcelFileDescriptor,
+        val isPendingMediaStoreItem: Boolean
+    )
+
+    private fun exportPrescriptionPdf(fileName: String, payloadJson: String) {
+        val safeName = buildPdfFileName(fileName)
+        val output = try {
+            createPdfOutput(safeName)
+        } catch (e: Exception) {
+            notifyPdfExportComplete(false, "Could not create PDF file: ${e.message}")
+            Toast.makeText(this@MainActivity, "Could not create PDF file", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val payload = JSONObject(payloadJson)
+            val document = PdfDocument()
+            val pageWidth = 595
+            val pageHeight = 842
+            val margin = 42f
+            var pageNumber = 1
+            var page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+            var canvas = page.canvas
+            var y = margin
+
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(10, 25, 41)
+                textSize = 24f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(0, 100, 100)
+                textSize = 13f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(95, 95, 95)
+                textSize = 10f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(25, 25, 25)
+                textSize = 12f
+            }
+            val smallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(65, 65, 65)
+                textSize = 10.5f
+            }
+            val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(210, 210, 210)
+                strokeWidth = 1f
+            }
+
+            fun newPage() {
+                document.finishPage(page)
+                pageNumber++
+                page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+                canvas = page.canvas
+                y = margin
+            }
+
+            fun ensureSpace(height: Float) {
+                if (y + height > pageHeight - margin) newPage()
+            }
+
+            fun drawWrappedText(text: String, x: Float, paint: Paint, maxWidth: Float, lineHeight: Float) {
+                val words = text.replace("\r", "").split(Regex("\\s+"))
+                var line = ""
+                if (words.isEmpty()) {
+                    ensureSpace(lineHeight)
+                    canvas.drawText("", x, y, paint)
+                    y += lineHeight
+                    return
+                }
+                words.forEach { word ->
+                    val candidate = if (line.isBlank()) word else "$line $word"
+                    if (paint.measureText(candidate) <= maxWidth) {
+                        line = candidate
+                    } else {
+                        ensureSpace(lineHeight)
+                        canvas.drawText(line, x, y, paint)
+                        y += lineHeight
+                        line = word
+                    }
+                }
+                if (line.isNotBlank()) {
+                    ensureSpace(lineHeight)
+                    canvas.drawText(line, x, y, paint)
+                    y += lineHeight
+                }
+            }
+
+            fun drawField(label: String, value: String, x: Float, width: Float) {
+                ensureSpace(34f)
+                canvas.drawText(label.uppercase(Locale.US), x, y, labelPaint)
+                y += 15f
+                drawWrappedText(value.ifBlank { "N/A" }, x, bodyPaint, width, 15f)
+            }
+
+            fun drawSection(title: String) {
+                ensureSpace(32f)
+                y += 8f
+                canvas.drawText(title.uppercase(Locale.US), margin, y, headingPaint)
+                y += 8f
+                canvas.drawLine(margin, y, pageWidth - margin, y, linePaint)
+                y += 18f
+            }
+
+            canvas.drawText("Prescription", margin, y, titlePaint)
+            canvas.drawText("MedVault Patient Record", pageWidth - margin - smallPaint.measureText("MedVault Patient Record"), y, smallPaint)
+            y += 22f
+            canvas.drawLine(margin, y, pageWidth - margin, y, linePaint)
+            y += 28f
+
+            val leftWidth = 240f
+            val rightX = 320f
+            val rowStart = y
+            drawField("Patient Name", payload.optString("patientName", "N/A"), margin, leftWidth)
+            y = rowStart
+            drawField("Date of Visit", payload.optString("dateOfVisit", "N/A"), rightX, 210f)
+            y += 8f
+            val rowTwoStart = y
+            drawField("Phone Number", payload.optString("phoneNumber", "N/A"), margin, leftWidth)
+            y = rowTwoStart
+            drawField("Patient ID", payload.optString("patientId", "N/A"), rightX, 210f)
+
+            drawSection("Diagnosis")
+            drawWrappedText(payload.optString("diagnosis", "N/A"), margin, bodyPaint, pageWidth - (margin * 2), 16f)
+
+            drawSection("Medicines")
+            drawWrappedText(payload.optString("medicines", "Not prescribed yet"), margin, bodyPaint, pageWidth - (margin * 2), 16f)
+
+            drawSection("Prescription Details")
+            val prescriptions = payload.optJSONArray("prescriptions") ?: JSONArray()
+            if (prescriptions.length() == 0) {
+                drawWrappedText("No structured prescriptions added", margin, bodyPaint, pageWidth - (margin * 2), 16f)
+            } else {
+                for (i in 0 until prescriptions.length()) {
+                    val item = prescriptions.optJSONObject(i) ?: JSONObject()
+                    ensureSpace(46f)
+                    canvas.drawText("${i + 1}.", margin, y, bodyPaint)
+                    drawWrappedText(item.optString("medicine", "Medicine"), margin + 24f, bodyPaint, pageWidth - margin * 2 - 24f, 16f)
+                    val meta = item.optString("meta", "")
+                    if (meta.isNotBlank()) drawWrappedText(meta, margin + 24f, smallPaint, pageWidth - margin * 2 - 24f, 14f)
+                    val instructions = item.optString("instructions", "")
+                    if (instructions.isNotBlank()) drawWrappedText(instructions, margin + 24f, smallPaint, pageWidth - margin * 2 - 24f, 14f)
+                    y += 8f
+                }
+            }
+
+            ensureSpace(72f)
+            y += 42f
+            canvas.drawLine(pageWidth - margin - 180f, y, pageWidth - margin, y, linePaint)
+            y += 15f
+            canvas.drawText("Doctor Signature", pageWidth - margin - 145f, y, smallPaint)
+
+            document.finishPage(page)
+            document.writeTo(java.io.FileOutputStream(output.descriptor.fileDescriptor))
+            document.close()
+            output.descriptor.close()
+            completePdfOutput(output, true)
+            notifyPdfExportComplete(true, "Saved to Downloads/MedVault/$safeName")
+            Toast.makeText(this@MainActivity, "PDF saved to Downloads/MedVault", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            try {
+                output.descriptor.close()
+            } catch (_: Exception) {
+            }
+            completePdfOutput(output, false)
+            notifyPdfExportComplete(false, e.message ?: "PDF export failed")
+            Toast.makeText(this@MainActivity, "PDF export failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun createPdfOutput(fileName: String): PdfOutput {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/MedVault")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw Exception("Downloads storage is not available")
+            val descriptor = contentResolver.openFileDescriptor(uri, "w")
+                ?: throw Exception("Could not open PDF file")
+            return PdfOutput(uri, descriptor, true)
+        }
+
+        val directory = JavaFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MedVault")
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw Exception("Could not create Downloads/MedVault")
+        }
+        val file = JavaFile(directory, fileName)
+        val descriptor = ParcelFileDescriptor.open(
+            file,
+            ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE or ParcelFileDescriptor.MODE_WRITE_ONLY
+        )
+        return PdfOutput(Uri.fromFile(file), descriptor, false)
+    }
+
+    private fun completePdfOutput(output: PdfOutput, success: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && output.isPendingMediaStoreItem) {
+            if (success) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                contentResolver.update(output.uri, values, null, null)
+            } else {
+                contentResolver.delete(output.uri, null, null)
+            }
+        }
+    }
+
+    private fun buildPdfFileName(fileName: String): String {
+        val baseName = sanitizeFileName(fileName.removeSuffix(".pdf").ifBlank { "Prescription" })
+        return "${baseName}_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.pdf"
     }
 
     private fun handleSignInResult(completedTask: Task<GoogleSignInAccount>) {
@@ -692,6 +944,15 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             webView.evaluateJavascript(
                 "if(typeof onReportDeleteComplete === 'function') onReportDeleteComplete($success, ${JSONObject.quote(payloadJson)});",
+                null
+            )
+        }
+    }
+
+    private fun notifyPdfExportComplete(success: Boolean, message: String) {
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "if(typeof onPdfExportComplete === 'function') onPdfExportComplete($success, ${JSONObject.quote(message)});",
                 null
             )
         }

@@ -482,6 +482,22 @@
           transform: translateY(0);
         }
 
+        .btn-pdf {
+          background: linear-gradient(135deg, #f94144, #f3722c);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          box-shadow: 0 6px 16px rgba(249, 65, 68, 0.28);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.25rem;
+        }
+
+        .btn-pdf:active {
+          background: linear-gradient(135deg, #d62828, #e85d04);
+          transform: translateY(0);
+        }
+
         .btn-small {
           padding: 0.5rem 1rem;
           font-size: 0.7rem;
@@ -700,6 +716,16 @@
           font-size: 0.9rem;
           color: var(--text);
           word-break: break-word;
+        }
+
+        .phone-link {
+          color: var(--primary);
+          text-decoration: none;
+          font-weight: 600;
+        }
+
+        .phone-link:hover {
+          text-decoration: underline;
         }
 
         @keyframes slideDown {
@@ -925,6 +951,21 @@
             background: #ff6b6b !important;
             color: #0a1929 !important;
             box-shadow: 0 0 10px rgba(255, 107, 107, 0.4) !important;
+            transform: scale(0.95) !important;
+          }
+
+          .actions-cell .btn-pdf {
+            background: linear-gradient(135deg, rgba(249, 65, 68, 0.24), rgba(243, 114, 44, 0.28)) !important;
+            color: #ffd6d6 !important;
+            border: 1px solid rgba(249, 65, 68, 0.55) !important;
+            box-shadow: 0 0 12px rgba(249, 65, 68, 0.18) !important;
+            font-size: 0.68rem !important;
+            letter-spacing: 0.5px !important;
+          }
+
+          .actions-cell .btn-pdf:active {
+            background: linear-gradient(135deg, #f94144, #f3722c) !important;
+            color: #fff !important;
             transform: scale(0.95) !important;
           }
 
@@ -2366,6 +2407,146 @@
       }
     }
 
+    function formatPhoneLink(phoneNumber) {
+      const phone = String(phoneNumber || '').trim();
+      if (!phone) return 'N/A';
+      const dialNumber = phone.replace(/[^\d+]/g, '');
+      if (!dialNumber) return escapeHtml(phone);
+      return '<a class="phone-link" href="tel:' + encodeURIComponent(dialNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(phone) + '</a>';
+    }
+
+    async function exportPrescriptionPdf(recordId) {
+      const records = await loadData('patient-records');
+      const record = records.find(function(item) {
+        return String(item.id) === String(recordId);
+      });
+      if (!record) {
+        showWarningMessage('Record not found');
+        return;
+      }
+
+      const printableHtml = buildPrescriptionPrintHtml(record);
+      const fileName = buildPrescriptionPdfFileName(record);
+      if (typeof GoogleDrive !== 'undefined' && GoogleDrive.exportPdf) {
+        showSuccessMessage('Preparing PDF export...');
+        GoogleDrive.exportPdf(fileName, JSON.stringify(buildPrescriptionPdfPayload(record)));
+        return;
+      }
+
+      const frame = document.createElement('iframe');
+      frame.style.position = 'fixed';
+      frame.style.right = '0';
+      frame.style.bottom = '0';
+      frame.style.width = '0';
+      frame.style.height = '0';
+      frame.style.border = '0';
+      document.body.appendChild(frame);
+
+      const frameDoc = frame.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(printableHtml);
+      frameDoc.close();
+
+      setTimeout(function() {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+          showSuccessMessage('PDF export ready. Choose Save as PDF.');
+        } catch (error) {
+          showWarningMessage('PDF export could not be opened on this device.');
+        }
+        setTimeout(function() {
+          if (frame.parentNode) frame.parentNode.removeChild(frame);
+        }, 30000);
+      }, 300);
+    }
+
+    window.onPdfExportComplete = function(success, message) {
+      if (success) {
+        showSuccessMessage(message || 'PDF saved to phone Downloads');
+      } else {
+        showWarningMessage(message || 'PDF export failed');
+      }
+    };
+
+    function buildPrescriptionPdfFileName(record) {
+      const name = sanitizePdfFileName(record.patientName || 'Patient');
+      const visitDate = sanitizePdfFileName(record.dateOfVisit || new Date().toISOString().slice(0, 10));
+      return 'Prescription_' + name + '_' + visitDate + '.pdf';
+    }
+
+    function sanitizePdfFileName(value) {
+      return String(value || '')
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80) || 'Prescription';
+    }
+
+    function buildPrescriptionPdfPayload(record) {
+      const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(function(item) {
+        item = normalizePrescriptionItem(item);
+        const meta = [
+          item.potency ? 'Potency: ' + item.potency + (item.scaleNumber || '') + (item.scale || '') : '',
+          normalizePrescriptionVehicle(item.vehicle),
+          item.duration ? 'Duration: ' + item.duration : ''
+        ].filter(Boolean).join(' | ');
+        return {
+          medicine: getPrescriptionMedicine(item) || 'Medicine',
+          meta: meta,
+          instructions: item.instructions || ''
+        };
+      }) : [];
+      return {
+        patientName: record.patientName || 'N/A',
+        patientId: record.patientId || 'N/A',
+        phoneNumber: record.phoneNumber || 'N/A',
+        dateOfVisit: record.dateOfVisit ? new Date(record.dateOfVisit).toLocaleDateString() : 'N/A',
+        diagnosis: record.diagnosis || 'N/A',
+        medicines: record.medicines || 'Not prescribed yet',
+        status: record.status || 'In Progress',
+        prescriptions: prescriptions
+      };
+    }
+
+    function buildPrescriptionPrintHtml(record) {
+      const visitDate = record.dateOfVisit ? new Date(record.dateOfVisit).toLocaleDateString() : 'N/A';
+      const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(normalizePrescriptionItem) : [];
+      const prescriptionsHtml = prescriptions.length
+        ? prescriptions.map(function(item, index) {
+            const meta = [
+              item.potency ? 'Potency: ' + item.potency + (item.scaleNumber || '') + (item.scale || '') : '',
+              normalizePrescriptionVehicle(item.vehicle),
+              item.duration ? 'Duration: ' + item.duration : ''
+            ].filter(Boolean).join(' | ');
+            return '<tr><td>' + (index + 1) + '</td><td><strong>' + escapeHtml(getPrescriptionMedicine(item) || 'Medicine') + '</strong>' + (meta ? '<br><span>' + escapeHtml(meta) + '</span>' : '') + (item.instructions ? '<br><span>' + escapeHtml(item.instructions) + '</span>' : '') + '</td></tr>';
+          }).join('')
+        : '<tr><td colspan="2">No structured prescriptions added</td></tr>';
+
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Prescription - ' + escapeHtml(record.patientName || 'Patient') + '</title><style>' +
+        'body{font-family:Arial,sans-serif;color:#111;margin:0;padding:32px;background:#fff;}' +
+        '.sheet{max-width:760px;margin:0 auto;border:1px solid #ddd;padding:28px;}' +
+        '.header{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #111;padding-bottom:16px;margin-bottom:22px;}' +
+        'h1{font-size:24px;margin:0 0 6px;} .subtitle{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#555;}' +
+        '.date{text-align:right;font-size:14px;} .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:22px;}' +
+        '.label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-bottom:4px;} .value{font-size:15px;white-space:pre-wrap;}' +
+        '.section{margin-top:22px;} h2{font-size:15px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #ddd;padding-bottom:6px;margin:0 0 10px;}' +
+        'table{width:100%;border-collapse:collapse;} td{vertical-align:top;border-bottom:1px solid #e5e5e5;padding:10px 8px;font-size:14px;} td:first-child{width:40px;color:#666;} span{color:#444;font-size:13px;}' +
+        '.footer{margin-top:48px;display:flex;justify-content:flex-end;} .signature{width:220px;border-top:1px solid #111;text-align:center;padding-top:8px;font-size:13px;color:#444;}' +
+        '@media print{body{padding:0}.sheet{border:0;max-width:none;padding:20px}.no-print{display:none}}' +
+        '</style></head><body><main class="sheet">' +
+        '<div class="header"><div><h1>Prescription</h1><div class="subtitle">MedVault Patient Record</div></div><div class="date"><div class="label">Date of Visit</div><div class="value">' + escapeHtml(visitDate) + '</div></div></div>' +
+        '<div class="grid"><div><div class="label">Patient Name</div><div class="value">' + escapeHtml(record.patientName || 'N/A') + '</div></div>' +
+        '<div><div class="label">Phone Number</div><div class="value">' + escapeHtml(record.phoneNumber || 'N/A') + '</div></div>' +
+        '<div><div class="label">Patient ID</div><div class="value">' + escapeHtml(record.patientId || 'N/A') + '</div></div>' +
+        '<div><div class="label">Status</div><div class="value">' + escapeHtml(record.status || 'In Progress') + '</div></div></div>' +
+        '<section class="section"><h2>Diagnosis</h2><div class="value">' + escapeHtml(record.diagnosis || 'N/A') + '</div></section>' +
+        '<section class="section"><h2>Medicines</h2><div class="value">' + escapeHtml(record.medicines || 'Not prescribed yet') + '</div></section>' +
+        '<section class="section"><h2>Prescription Details</h2><table>' + prescriptionsHtml + '</table></section>' +
+        '<div class="footer"><div class="signature">Doctor Signature</div></div>' +
+        '</main></body></html>';
+    }
+
     function renderSelectedReports(existingReports) {
       const list = document.getElementById('selected-reports-list');
       const input = document.getElementById('report-files');
@@ -3078,7 +3259,7 @@
             <span style="font-size: 1.5rem;">📋</span>
           </td>
           <td>${record.patientName}</td>
-          <td>${record.phoneNumber || 'N/A'}</td>
+          <td>${formatPhoneLink(record.phoneNumber)}</td>
           <td>${new Date(record.dateOfVisit).toLocaleDateString()}</td>
           <td>
             <span style="padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;white-space:nowrap;background:${(record.status === 'Complete') ? 'rgba(76,175,80,0.2)' : 'rgba(255,152,0,0.2)'};color:${(record.status === 'Complete') ? 'var(--success)' : 'var(--warning)'};">
@@ -3087,6 +3268,7 @@
           </td>
           <td onclick="event.stopPropagation()">
             <div class="actions-cell">
+              <button class="btn btn-pdf btn-small" onclick="exportPrescriptionPdf(${record.id})" title="Export prescription as PDF" aria-label="Export prescription as PDF">PDF</button>
               <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})" title="Edit record">✏️</button>
               <button class="btn btn-secondary btn-small" onclick="deleteRecord(${record.id})" title="Delete record">🗑️</button>
             </div>
@@ -3102,7 +3284,7 @@
 
       const fields = [
         { label: 'Patient Name', value: record.patientName },
-        { label: 'Phone Number', value: record.phoneNumber || 'N/A' },
+        { label: 'Phone Number', html: formatPhoneLink(record.phoneNumber) },
         { label: 'Date of Visit', value: new Date(record.dateOfVisit).toLocaleDateString() },
         { label: 'Diagnosis', value: record.diagnosis || 'N/A' },
         { label: 'Medicine', value: record.medicines || 'Not prescribed yet' },
@@ -3112,7 +3294,7 @@
       const fieldsHtml = fields.map(f => `
         <div class="detail-field">
           <span class="detail-field-label">${f.label}</span>
-          <span class="detail-field-value">${escapeHtml(f.value)}</span>
+          <span class="detail-field-value">${f.html || escapeHtml(f.value)}</span>
         </div>
       `).join('');
 
@@ -3152,7 +3334,6 @@
         closeDetailModal();
         editRecord(id);
       };
-
       document.getElementById('detail-modal').classList.add('show');
     }
 
