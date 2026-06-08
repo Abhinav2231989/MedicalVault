@@ -961,7 +961,7 @@
           border: 1px solid rgba(0, 168, 168, 0.3);
           border-top: none;
           border-radius: 0 0 12px 12px;
-          max-height: 200px;
+          max-height: 300px;
           overflow-y: auto;
           z-index: 1000;
           display: none;
@@ -1009,6 +1009,33 @@
           margin-top: 0.15rem;
           opacity: 0.8;
         }
+
+        .autocomplete-loading {
+          padding: 0.65rem 1rem;
+          color: var(--text-dim);
+          font-size: 0.75rem;
+          font-style: italic;
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          border-top: 1px solid rgba(46, 82, 102, 0.3);
+          background: rgba(20, 42, 60, 0.4);
+        }
+
+        .autocomplete-spinner {
+          width: 12px;
+          height: 12px;
+          border: 2px solid rgba(0, 242, 254, 0.2);
+          border-top-color: #00f2fe;
+          border-radius: 50%;
+          display: inline-block;
+          animation: autocomplete-spin 0.6s linear infinite;
+        }
+
+        @keyframes autocomplete-spin {
+          to { transform: rotate(360deg); }
+        }
+
 
         .report-list {
           display: flex;
@@ -1358,6 +1385,7 @@
 </div>
 
 <script src="homeopathic-medicines.js"></script>
+<script src="common-diagnoses.js"></script>
 <script>
     // Storage adapters
     const storage = {
@@ -3144,77 +3172,54 @@
     }
 
     // Medical Autocomplete Data
-    const commonDiagnoses = [
-      { name: "Hypertension", category: "Cardiovascular" },
-      { name: "Type 2 Diabetes Mellitus", category: "Endocrine" },
-      { name: "Type 1 Diabetes Mellitus", category: "Endocrine" },
-      { name: "Asthma", category: "Respiratory" },
-      { name: "COPD (Chronic Obstructive Pulmonary Disease)", category: "Respiratory" },
-      { name: "Pneumonia", category: "Respiratory" },
-      { name: "Bronchitis", category: "Respiratory" },
-      { name: "Upper Respiratory Tract Infection", category: "Respiratory" },
-      { name: "Gastroesophageal Reflux Disease (GERD)", category: "Digestive" },
-      { name: "Gastritis", category: "Digestive" },
-      { name: "Peptic Ulcer", category: "Digestive" },
-      { name: "Irritable Bowel Syndrome (IBS)", category: "Digestive" },
-      { name: "Urinary Tract Infection (UTI)", category: "Urinary" },
-      { name: "Migraine", category: "Neurological" },
-      { name: "Tension Headache", category: "Neurological" },
-      { name: "Anxiety Disorder", category: "Mental Health" },
-      { name: "Depression", category: "Mental Health" },
-      { name: "Arthritis", category: "Musculoskeletal" },
-      { name: "Osteoarthritis", category: "Musculoskeletal" },
-      { name: "Rheumatoid Arthritis", category: "Musculoskeletal" },
-      { name: "Back Pain", category: "Musculoskeletal" },
-      { name: "Hypothyroidism", category: "Endocrine" },
-      { name: "Hyperthyroidism", category: "Endocrine" },
-      { name: "Anemia", category: "Hematologic" },
-      { name: "Iron Deficiency Anemia", category: "Hematologic" },
-      { name: "Allergic Rhinitis", category: "Allergic" },
-      { name: "Dermatitis", category: "Dermatologic" },
-      { name: "Eczema", category: "Dermatologic" },
-      { name: "Psoriasis", category: "Dermatologic" },
-      { name: "Coronary Artery Disease", category: "Cardiovascular" },
-      { name: "Heart Failure", category: "Cardiovascular" },
-      { name: "Atrial Fibrillation", category: "Cardiovascular" },
-      { name: "Hyperlipidemia", category: "Cardiovascular" },
-      { name: "Obesity", category: "Metabolic" },
-      { name: "Flu (Influenza)", category: "Infectious" },
-      { name: "Common Cold", category: "Infectious" },
-      { name: "Fever", category: "General" },
-      { name: "Sinusitis", category: "Respiratory" },
-      { name: "Tonsillitis", category: "Respiratory" },
-      { name: "Pharyngitis", category: "Respiratory" }
-    ];
+    const commonDiagnoses = window.COMMON_DIAGNOSES || [];
 
     const allopathicMedicines = [
       { name: "Paracetamol", category: "Allopathic - analgesic/antipyretic" },
       { name: "Ibuprofen", category: "Allopathic - NSAID" },
-      { name: "Amoxicillin", category: "Allopathic - antibiotic" },
-      { name: "Azithromycin", category: "Allopathic - antibiotic" },
-      { name: "Cefixime", category: "Allopathic - antibiotic" },
+      { name: "Aspirin", category: "Allopathic - antiplatelet/analgesic" },
+      { name: "Diclofenac", category: "Allopathic - NSAID" },
+      { name: "Naproxen", category: "Allopathic - NSAID" },
+      { name: "Tramadol", category: "Allopathic - opioid analgesic" },
+      { name: "Amoxicillin", category: "Allopathic - penicillin antibiotic" },
+      { name: "Azithromycin", category: "Allopathic - macrolide antibiotic" },
+      { name: "Cefixime", category: "Allopathic - cephalosporin antibiotic" },
+      { name: "Doxycycline", category: "Allopathic - tetracycline antibiotic" },
+      { name: "Ciprofloxacin", category: "Allopathic - fluoroquinolone antibiotic" },
+      { name: "Amoxicillin + Clavulanate (Augmentin)", category: "Allopathic - combination antibiotic" },
       { name: "Cetirizine", category: "Allopathic - antihistamine" },
       { name: "Levocetirizine", category: "Allopathic - antihistamine" },
-      { name: "Montelukast", category: "Allopathic - respiratory" },
-      { name: "Salbutamol", category: "Allopathic - bronchodilator" },
-      { name: "Budesonide", category: "Allopathic - corticosteroid" },
-      { name: "Pantoprazole", category: "Allopathic - acid reducer" },
-      { name: "Omeprazole", category: "Allopathic - acid reducer" },
-      { name: "Metformin", category: "Allopathic - antidiabetic" },
-      { name: "Glimepiride", category: "Allopathic - antidiabetic" },
-      { name: "Amlodipine", category: "Allopathic - antihypertensive" },
-      { name: "Telmisartan", category: "Allopathic - antihypertensive" },
-      { name: "Losartan", category: "Allopathic - antihypertensive" },
-      { name: "Atorvastatin", category: "Allopathic - statin" },
-      { name: "Rosuvastatin", category: "Allopathic - statin" },
-      { name: "Aspirin", category: "Allopathic - antiplatelet/analgesic" },
-      { name: "Clopidogrel", category: "Allopathic - antiplatelet" },
+      { name: "Fexofenadine (Allegra)", category: "Allopathic - antihistamine" },
+      { name: "Montelukast", category: "Allopathic - leukotriene receptor antagonist" },
+      { name: "Salbutamol (Albuterol)", category: "Allopathic - beta-2 agonist bronchodilator" },
+      { name: "Budesonide", category: "Allopathic - inhaled corticosteroid" },
+      { name: "Fluticasone propionate", category: "Allopathic - nasal corticosteroid" },
+      { name: "Pantoprazole", category: "Allopathic - proton pump inhibitor" },
+      { name: "Omeprazole", category: "Allopathic - proton pump inhibitor" },
+      { name: "Ranitidine", category: "Allopathic - H2 blocker" },
       { name: "Ondansetron", category: "Allopathic - antiemetic" },
-      { name: "Domperidone", category: "Allopathic - antiemetic" },
-      { name: "Doxycycline", category: "Allopathic - antibiotic" },
-      { name: "Ciprofloxacin", category: "Allopathic - antibiotic" }
+      { name: "Domperidone", category: "Allopathic - antiemetic/prokinetic" },
+      { name: "Metformin", category: "Allopathic - biguanide antidiabetic" },
+      { name: "Glimepiride", category: "Allopathic - sulfonylurea antidiabetic" },
+      { name: "Sitagliptin", category: "Allopathic - DPP-4 inhibitor antidiabetic" },
+      { name: "Amlodipine", category: "Allopathic - calcium channel blocker antihypertensive" },
+      { name: "Telmisartan", category: "Allopathic - angiotensin receptor blocker antihypertensive" },
+      { name: "Losartan", category: "Allopathic - angiotensin receptor blocker antihypertensive" },
+      { name: "Metoprolol", category: "Allopathic - beta blocker antihypertensive" },
+      { name: "Atorvastatin", category: "Allopathic - HMG-CoA reductase inhibitor (statin)" },
+      { name: "Rosuvastatin", category: "Allopathic - HMG-CoA reductase inhibitor (statin)" },
+      { name: "Clopidogrel", category: "Allopathic - antiplatelet" },
+      { name: "Loperamide", category: "Allopathic - antidiarrheal" },
+      { name: "Levothyroxine", category: "Allopathic - thyroid hormone replacement" },
+      { name: "Alprazolam", category: "Allopathic - benzodiazepine anxiolytic" },
+      { name: "Clonazepam", category: "Allopathic - benzodiazepine" },
+      { name: "Vitamin D3 (Cholecalciferol)", category: "Allopathic - vitamin supplement" },
+      { name: "Vitamin B-Complex", category: "Allopathic - vitamin supplement" },
+      { name: "Calcium + Vitamin D3", category: "Allopathic - mineral supplement" },
+      { name: "Folic Acid", category: "Allopathic - vitamin supplement" }
     ];
     const commonMedicines = allopathicMedicines.concat(window.HOMEOPATHIC_MEDICINES || []);
+
 
     // Autocomplete functionality
     let selectedSuggestionIndex = -1;
@@ -3230,11 +3235,11 @@
     const RXTERMS_API_URL = 'https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search';
     const DAILYMED_DRUGNAMES_API_URL = 'https://dailymed.nlm.nih.gov/dailymed/services/v2/drugnames.json';
 
-    function showSuggestions(fieldId, suggestions) {
+    function showSuggestions(fieldId, suggestions, isLoading) {
       const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
       if (!suggestionsDiv) return;
 
-      if (suggestions.length === 0) {
+      if (suggestions.length === 0 && !isLoading) {
         suggestionsDiv.classList.remove('show');
         return;
       }
@@ -3242,13 +3247,23 @@
       currentSuggestions = suggestions;
       selectedSuggestionIndex = -1;
 
-      suggestionsDiv.innerHTML = suggestions.map((item, index) => `
+      let html = suggestions.map((item, index) => `
         <div class="autocomplete-suggestion" data-index="${index}" onclick="selectSuggestion('${fieldId}', ${index})">
           <div>${highlightMatch(item.name, getAutocompleteQuery(fieldId))}</div>
           <div class="autocomplete-category">${escapeHtml(item.category || '')}</div>
         </div>
       `).join('');
 
+      if (isLoading) {
+        html += `
+          <div class="autocomplete-loading">
+            <span class="autocomplete-spinner"></span>
+            <span>Searching online database...</span>
+          </div>
+        `;
+      }
+
+      suggestionsDiv.innerHTML = html;
       suggestionsDiv.classList.add('show');
     }
 
@@ -3288,7 +3303,7 @@
       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    function getCurrentMedicineSegment(field) {
+    function getCurrentSegment(field) {
       const value = field.value || '';
       const cursor = field.selectionStart || value.length;
       const beforeCursor = value.slice(0, cursor);
@@ -3310,9 +3325,9 @@
       };
     }
 
-    function replaceCurrentMedicineSegment(field, replacement) {
+    function replaceCurrentSegment(field, replacement) {
       const value = field.value || '';
-      const segment = getCurrentMedicineSegment(field);
+      const segment = getCurrentSegment(field);
       const before = value.slice(0, segment.start);
       const after = value.slice(segment.end);
       const leadingSpace = before && !before.endsWith(' ') && !before.endsWith('\n') ? ' ' : '';
@@ -3366,7 +3381,7 @@
           };
         });
 
-      return mergeSuggestions(directMatches, fuzzyMatches).slice(0, 8);
+      return mergeSuggestions(directMatches, fuzzyMatches).slice(0, 15);
     }
 
     function mergeSuggestions() {
@@ -3392,7 +3407,7 @@
 
       const params = new URLSearchParams({
         terms: query,
-        maxList: '8',
+        maxList: '15',
         df: 'consumer_name,primary_name'
       });
       const response = await fetch(CONDITIONS_API_URL + '?' + params.toString(), { signal: signal });
@@ -3425,7 +3440,7 @@
 
       const params = new URLSearchParams({
         terms: query,
-        maxList: '8'
+        maxList: '15'
       });
       const response = await fetch(RXTERMS_API_URL + '?' + params.toString(), { signal: signal });
       if (!response.ok) throw new Error('RxTerms lookup failed');
@@ -3494,17 +3509,39 @@
       if (diagnosisSuggestController) diagnosisSuggestController.abort();
 
       const localMatches = getLocalDiagnosisSuggestions(query, commonDiagnoses);
-      showSuggestions('diagnosis', localMatches);
+      
+      // Only show suggestions box immediately if we have local matches
+      if (localMatches.length > 0) {
+        showSuggestions('diagnosis', localMatches, true);
+      } else {
+        const suggestionsDiv = document.getElementById('diagnosis-suggestions');
+        if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+      }
 
       try {
         diagnosisSuggestController = new AbortController();
         const onlineMatches = await fetchOnlineDiagnosisSuggestions(query, diagnosisSuggestController.signal);
         const field = document.getElementById('diagnosis');
-        if (!field || field.value.trim() !== query) return;
-        showSuggestions('diagnosis', mergeSuggestions(onlineMatches, localMatches).slice(0, 8));
+        if (!field) return;
+        const currentQuery = getCurrentSegment(field).query;
+        if (currentQuery !== query) return;
+        
+        const merged = mergeSuggestions(onlineMatches, localMatches).slice(0, 15);
+        if (merged.length > 0) {
+          showSuggestions('diagnosis', merged, false);
+        } else {
+          const suggestionsDiv = document.getElementById('diagnosis-suggestions');
+          if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+        }
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.warn('Online diagnosis lookup failed:', error);
+          if (localMatches.length > 0) {
+            showSuggestions('diagnosis', localMatches, false);
+          } else {
+            const suggestionsDiv = document.getElementById('diagnosis-suggestions');
+            if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+          }
         }
       }
     }
@@ -3516,7 +3553,14 @@
       if (medicineSuggestController) medicineSuggestController.abort();
 
       const localMatches = getLocalDiagnosisSuggestions(query, commonMedicines);
-      showSuggestions(fieldId, localMatches);
+      
+      // Only show suggestions box immediately if we have local matches
+      if (localMatches.length > 0) {
+        showSuggestions(fieldId, localMatches, true);
+      } else {
+        const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+        if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+      }
 
       try {
         medicineSuggestController = new AbortController();
@@ -3528,14 +3572,25 @@
         const dailyMedMatches = onlineResults[1].status === 'fulfilled' ? onlineResults[1].value : [];
         const field = document.getElementById(fieldId);
         if (!field) return;
-        const currentQuery = fieldId === 'medicines'
-          ? getCurrentMedicineSegment(field).query
-          : field.value.trim();
+        const currentQuery = getCurrentSegment(field).query;
         if (currentQuery !== query) return;
-        showSuggestions(fieldId, mergeSuggestions(localMatches, rxTermsMatches, dailyMedMatches).slice(0, 8));
+        
+        const merged = mergeSuggestions(localMatches, rxTermsMatches, dailyMedMatches).slice(0, 15);
+        if (merged.length > 0) {
+          showSuggestions(fieldId, merged, false);
+        } else {
+          const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+          if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+        }
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.warn('Online medicine lookup failed:', error);
+          if (localMatches.length > 0) {
+            showSuggestions(fieldId, localMatches, false);
+          } else {
+            const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+            if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+          }
         }
       }
     }
@@ -3543,10 +3598,10 @@
     function handleVoicePostProcess(fieldId) {
       if (fieldId === 'diagnosis') {
         const field = document.getElementById('diagnosis');
-        if (field) refreshDiagnosisSuggestions(field.value.trim());
+        if (field) refreshDiagnosisSuggestions(getCurrentSegment(field).query);
       } else if (fieldId === 'medicines') {
         const field = document.getElementById('medicines');
-        if (field) refreshMedicineSuggestions(getCurrentMedicineSegment(field).query);
+        if (field) refreshMedicineSuggestions(getCurrentSegment(field).query);
       }
     }
 
@@ -3555,8 +3610,8 @@
       const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
 
       if (index >= 0 && index < currentSuggestions.length) {
-        if (fieldId === 'medicines') {
-          replaceCurrentMedicineSegment(field, currentSuggestions[index].name);
+        if (fieldId === 'medicines' || fieldId === 'diagnosis') {
+          replaceCurrentSegment(field, currentSuggestions[index].name);
         } else {
           field.value = currentSuggestions[index].name;
         }
@@ -3572,40 +3627,64 @@
       field.dataset.autocompleteBound = 'true';
 
       field.addEventListener('input', function() {
-        const query = fieldId === 'medicines'
-          ? getCurrentMedicineSegment(this).query
+        const query = fieldId === 'medicines' || fieldId === 'diagnosis'
+          ? getCurrentSegment(this).query
           : this.value.trim();
 
         if (query.length < 2) {
+          if (fieldId === 'diagnosis') {
+            if (diagnosisSuggestTimer) clearTimeout(diagnosisSuggestTimer);
+            if (diagnosisSuggestController) diagnosisSuggestController.abort();
+          } else if (isMedicineAutocompleteField(fieldId)) {
+            if (medicineSuggestTimer) clearTimeout(medicineSuggestTimer);
+            if (medicineSuggestController) medicineSuggestController.abort();
+          }
           const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
           if (suggestionsDiv) suggestionsDiv.classList.remove('show');
           return;
         }
 
         if (fieldId === 'diagnosis') {
+          if (diagnosisSuggestTimer) clearTimeout(diagnosisSuggestTimer);
           diagnosisSuggestTimer = setTimeout(async function() {
             refreshDiagnosisSuggestions(query);
           }, 350);
           const localMatches = getLocalDiagnosisSuggestions(query, dataList);
-          showSuggestions(fieldId, localMatches);
+          if (localMatches.length > 0) {
+            showSuggestions(fieldId, localMatches, true);
+          } else {
+            const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+            if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+          }
           return;
         }
 
         if (isMedicineAutocompleteField(fieldId)) {
+          if (medicineSuggestTimer) clearTimeout(medicineSuggestTimer);
           medicineSuggestTimer = setTimeout(async function() {
             refreshMedicineSuggestions(query, fieldId);
           }, 350);
           const localMatches = getLocalDiagnosisSuggestions(query, dataList);
-          showSuggestions(fieldId, localMatches);
+          if (localMatches.length > 0) {
+            showSuggestions(fieldId, localMatches, true);
+          } else {
+            const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+            if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+          }
           return;
         }
 
         const normalizedQuery = query.toLowerCase();
         const matches = dataList.filter(item =>
           item.name.toLowerCase().includes(normalizedQuery)
-        ).slice(0, 8);
+        ).slice(0, 15);
 
-        showSuggestions(fieldId, matches);
+        if (matches.length > 0) {
+          showSuggestions(fieldId, matches, false);
+        } else {
+          const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
+          if (suggestionsDiv) suggestionsDiv.classList.remove('show');
+        }
       });
 
       field.addEventListener('keydown', function(e) {
@@ -3635,6 +3714,8 @@
         }
       });
     }
+
+
 
     function updateSelectedSuggestion(fieldId) {
       const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
