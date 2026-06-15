@@ -991,6 +991,10 @@
           width: 100%;
         }
 
+        .autocomplete-container:focus-within {
+          z-index: 20;
+        }
+
         .autocomplete-suggestions {
           position: absolute;
           top: 100%;
@@ -3451,7 +3455,7 @@
     function getAutocompleteQuery(fieldId) {
       const field = document.getElementById(fieldId);
       if (!field) return '';
-      if (fieldId === 'medicines') {
+      if (fieldId === 'medicines' || fieldId === 'diagnosis') {
         return getCurrentMedicineSegment(field).query;
       }
       return field.value.trim();
@@ -3504,6 +3508,16 @@
         end: endOffset,
         query: value.slice(start, endOffset).trim()
       };
+    }
+
+    function getCurrentMedicineSegment(field) {
+      const segment = getCurrentSegment(field);
+      const query = segment.query
+        .replace(/^\s*(rx|medicine|medicines|remedy|remedies)\s*[:.-]\s*/i, '')
+        .replace(/\s+\d+\s*(x|c|ch|m|cm|lm|q|drops?|tabs?|tablets?|pills?|globules?)\s*$/i, '')
+        .trim();
+
+      return Object.assign({}, segment, { query: query });
     }
 
     function replaceCurrentSegment(field, replacement) {
@@ -3563,6 +3577,39 @@
         });
 
       return mergeSuggestions(directMatches, fuzzyMatches).slice(0, 15);
+    }
+
+    function getLocalMedicineSuggestions(query, dataList) {
+      const normalizedQuery = query.toLowerCase();
+      const startsWithMatches = dataList.filter(function(item) {
+        return item.name.toLowerCase().startsWith(normalizedQuery);
+      });
+      const wordStartMatches = dataList.filter(function(item) {
+        return item.name.toLowerCase().split(/[^a-z0-9]+/).some(function(word) {
+          return word.startsWith(normalizedQuery);
+        });
+      });
+      const containsMatches = dataList.filter(function(item) {
+        return item.name.toLowerCase().includes(normalizedQuery);
+      });
+
+      const fuzzyMatches = dataList
+        .filter(function(item) {
+          const words = item.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+          return words.some(function(word) {
+            const maxDistance = normalizedQuery.length <= 6 ? 1 : 2;
+            return Math.abs(word.length - normalizedQuery.length) <= maxDistance &&
+              levenshteinDistance(normalizedQuery, word) <= maxDistance;
+          });
+        })
+        .map(function(item) {
+          return {
+            name: item.name,
+            category: item.category + ' - suggested correction'
+          };
+        });
+
+      return mergeSuggestions(startsWithMatches, wordStartMatches, containsMatches, fuzzyMatches).slice(0, 15);
     }
 
     function mergeSuggestions() {
@@ -3733,7 +3780,7 @@
       if (medicineSuggestTimer) clearTimeout(medicineSuggestTimer);
       if (medicineSuggestController) medicineSuggestController.abort();
 
-      const localMatches = getLocalDiagnosisSuggestions(query, commonMedicines);
+      const localMatches = getLocalMedicineSuggestions(query, commonMedicines);
       
       // Only show suggestions box immediately if we have local matches
       if (localMatches.length > 0) {
@@ -3753,7 +3800,7 @@
         const dailyMedMatches = onlineResults[1].status === 'fulfilled' ? onlineResults[1].value : [];
         const field = document.getElementById(fieldId);
         if (!field) return;
-        const currentQuery = getCurrentSegment(field).query;
+        const currentQuery = getAutocompleteQuery(fieldId);
         if (currentQuery !== query) return;
         
         const merged = mergeSuggestions(localMatches, rxTermsMatches, dailyMedMatches).slice(0, 15);
@@ -3782,7 +3829,7 @@
         if (field) refreshDiagnosisSuggestions(getCurrentSegment(field).query);
       } else if (fieldId === 'medicines') {
         const field = document.getElementById('medicines');
-        if (field) refreshMedicineSuggestions(getCurrentSegment(field).query);
+        if (field) refreshMedicineSuggestions(getCurrentMedicineSegment(field).query);
       }
     }
 
@@ -3807,10 +3854,10 @@
       if (field.dataset.autocompleteBound === 'true') return;
       field.dataset.autocompleteBound = 'true';
 
-      field.addEventListener('input', function() {
+      function updateAutocompleteSuggestions() {
         const query = fieldId === 'medicines' || fieldId === 'diagnosis'
-          ? getCurrentSegment(this).query
-          : this.value.trim();
+          ? getCurrentMedicineSegment(field).query
+          : field.value.trim();
 
         if (query.length < 2) {
           if (fieldId === 'diagnosis') {
@@ -3845,7 +3892,7 @@
           medicineSuggestTimer = setTimeout(async function() {
             refreshMedicineSuggestions(query, fieldId);
           }, 350);
-          const localMatches = getLocalDiagnosisSuggestions(query, dataList);
+          const localMatches = getLocalMedicineSuggestions(query, dataList);
           if (localMatches.length > 0) {
             showSuggestions(fieldId, localMatches, true);
           } else {
@@ -3866,7 +3913,7 @@
           const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
           if (suggestionsDiv) suggestionsDiv.classList.remove('show');
         }
-      });
+      }
 
       field.addEventListener('keydown', function(e) {
         const suggestionsDiv = document.getElementById(fieldId + '-suggestions');
@@ -3885,6 +3932,17 @@
           selectSuggestion(fieldId, selectedSuggestionIndex);
         } else if (e.key === 'Escape') {
           suggestionsDiv.classList.remove('show');
+        }
+      });
+
+      field.addEventListener('input', updateAutocompleteSuggestions);
+      field.addEventListener('keyup', function(e) {
+        if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].indexOf(e.key) !== -1) return;
+        updateAutocompleteSuggestions();
+      });
+      field.addEventListener('click', function() {
+        if (fieldId === 'medicines' || fieldId === 'diagnosis') {
+          updateAutocompleteSuggestions();
         }
       });
 
