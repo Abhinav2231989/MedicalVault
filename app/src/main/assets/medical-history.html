@@ -483,19 +483,30 @@
         }
 
         .btn-pdf {
-          background: linear-gradient(135deg, #f94144, #f3722c);
-          color: white;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          box-shadow: 0 6px 16px rgba(249, 65, 68, 0.28);
+          background: linear-gradient(135deg, #00d4ff, #00a8a8);
+          color: #062235;
+          border: 1px solid rgba(163, 255, 250, 0.65);
+          box-shadow: 0 8px 18px rgba(0, 212, 255, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.35);
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 0.25rem;
+          gap: 0.35rem;
+          min-width: 86px;
+          min-height: 34px;
+          font-weight: 800;
+          letter-spacing: 0.6px;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
         }
 
         .btn-pdf:active {
-          background: linear-gradient(135deg, #d62828, #e85d04);
+          background: linear-gradient(135deg, #00a8a8, #008b8b);
           transform: translateY(0);
+        }
+
+        .btn-pdf::before {
+          content: "📄";
+          font-size: 0.85rem;
+          line-height: 1;
         }
 
         .btn-small {
@@ -689,6 +700,7 @@
           display: flex;
           gap: 0.5rem;
           flex-wrap: wrap;
+          align-items: center;
         }
 
         .record-row:hover {
@@ -955,17 +967,19 @@
           }
 
           .actions-cell .btn-pdf {
-            background: linear-gradient(135deg, rgba(249, 65, 68, 0.24), rgba(243, 114, 44, 0.28)) !important;
-            color: #ffd6d6 !important;
-            border: 1px solid rgba(249, 65, 68, 0.55) !important;
-            box-shadow: 0 0 12px rgba(249, 65, 68, 0.18) !important;
+            background: linear-gradient(135deg, #00d4ff, #00a8a8) !important;
+            color: #062235 !important;
+            border: 1px solid rgba(163, 255, 250, 0.65) !important;
+            box-shadow: 0 8px 18px rgba(0, 212, 255, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
             font-size: 0.68rem !important;
-            letter-spacing: 0.5px !important;
+            letter-spacing: 0.6px !important;
+            min-width: 86px !important;
+            min-height: 34px !important;
           }
 
           .actions-cell .btn-pdf:active {
-            background: linear-gradient(135deg, #f94144, #f3722c) !important;
-            color: #fff !important;
+            background: linear-gradient(135deg, #00a8a8, #008b8b) !important;
+            color: #062235 !important;
             transform: scale(0.95) !important;
           }
 
@@ -2432,7 +2446,7 @@
       const printableHtml = buildPrescriptionPrintHtml(record);
       const fileName = buildPrescriptionPdfFileName(record);
       if (typeof GoogleDrive !== 'undefined' && GoogleDrive.exportPdf) {
-        showSuccessMessage('Preparing PDF export...');
+        showSuccessMessage('Preparing export...');
         GoogleDrive.exportPdf(fileName, JSON.stringify(buildPrescriptionPdfPayload(record)));
         return;
       }
@@ -2455,9 +2469,9 @@
         try {
           frame.contentWindow.focus();
           frame.contentWindow.print();
-          showSuccessMessage('PDF export ready. Choose Save as PDF.');
+          showSuccessMessage('Export ready. Choose Save as PDF.');
         } catch (error) {
-          showWarningMessage('PDF export could not be opened on this device.');
+          showWarningMessage('Export could not be opened on this device.');
         }
         setTimeout(function() {
           if (frame.parentNode) frame.parentNode.removeChild(frame);
@@ -2467,16 +2481,29 @@
 
     window.onPdfExportComplete = function(success, message) {
       if (success) {
-        showSuccessMessage(message || 'PDF saved to phone Downloads');
+        showSuccessMessage(message || 'PDF ready to export');
       } else {
-        showWarningMessage(message || 'PDF export failed');
+        showWarningMessage(message || 'Export failed');
       }
     };
 
     function buildPrescriptionPdfFileName(record) {
       const name = sanitizePdfFileName(record.patientName || 'Patient');
-      const visitDate = sanitizePdfFileName(record.dateOfVisit || new Date().toISOString().slice(0, 10));
-      return 'Prescription_' + name + '_' + visitDate + '.pdf';
+      return name + '_' + formatVisitTimestampForPdf(record.dateOfVisit) + '.pdf';
+    }
+
+    function formatVisitTimestampForPdf(dateOfVisit) {
+      const now = new Date();
+      let visitDate = dateOfVisit ? new Date(dateOfVisit + 'T00:00:00') : now;
+      if (isNaN(visitDate.getTime())) visitDate = now;
+
+      const day = String(visitDate.getDate()).padStart(2, '0');
+      const month = String(visitDate.getMonth() + 1).padStart(2, '0');
+      const year = String(visitDate.getFullYear());
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      return day + month + year + hours + minutes + seconds;
     }
 
     function sanitizePdfFileName(value) {
@@ -3272,7 +3299,7 @@
           </td>
           <td onclick="event.stopPropagation()">
             <div class="actions-cell">
-              <button class="btn btn-pdf btn-small" onclick="exportPrescriptionPdf(${record.id})" title="Export prescription as PDF" aria-label="Export prescription as PDF">PDF</button>
+              <button class="btn btn-pdf btn-small" onclick="exportPrescriptionPdf(${record.id})" title="Export prescription as PDF" aria-label="Export prescription as PDF">Export</button>
               <button class="btn btn-primary btn-small" onclick="editRecord(${record.id})" title="Edit record">✏️</button>
               <button class="btn btn-secondary btn-small" onclick="deleteRecord(${record.id})" title="Delete record">🗑️</button>
             </div>

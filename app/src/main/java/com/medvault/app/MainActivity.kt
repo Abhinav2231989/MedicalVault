@@ -2,6 +2,7 @@ package com.medvault.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,6 +26,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -585,8 +587,8 @@ class MainActivity : AppCompatActivity() {
             document.close()
             output.descriptor.close()
             completePdfOutput(output, true)
-            notifyPdfExportComplete(true, "Saved to Downloads/MedVault/$safeName")
-            Toast.makeText(this@MainActivity, "PDF saved to Downloads/MedVault", Toast.LENGTH_LONG).show()
+            sharePdf(output.uri, safeName)
+            notifyPdfExportComplete(true, "PDF ready to export")
         } catch (e: Exception) {
             try {
                 output.descriptor.close()
@@ -622,7 +624,33 @@ class MainActivity : AppCompatActivity() {
             file,
             ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE or ParcelFileDescriptor.MODE_WRITE_ONLY
         )
-        return PdfOutput(Uri.fromFile(file), descriptor, false)
+        val uri = FileProvider.getUriForFile(
+            this,
+            "${applicationContext.packageName}.fileprovider",
+            file
+        )
+        return PdfOutput(uri, descriptor, false)
+    }
+
+    private fun sharePdf(uri: Uri, fileName: String) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            clipData = ClipData.newUri(contentResolver, fileName, uri)
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Prescription PDF")
+            putExtra(Intent.EXTRA_TITLE, fileName)
+            putExtra(Intent.EXTRA_TEXT, "Prescription PDF exported from MedVault.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(sendIntent, "Export prescription PDF").apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        try {
+            startActivity(chooser)
+        } catch (e: Exception) {
+            Toast.makeText(this, "No app available to export PDF", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun completePdfOutput(output: PdfOutput, success: Boolean) {
@@ -640,7 +668,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildPdfFileName(fileName: String): String {
         val baseName = sanitizeFileName(fileName.removeSuffix(".pdf").ifBlank { "Prescription" })
-        return "${baseName}_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.pdf"
+        return "$baseName.pdf"
     }
 
     private fun handleSignInResult(completedTask: Task<GoogleSignInAccount>) {
