@@ -1190,6 +1190,90 @@
             grid-column: span 2;
           }
         }
+
+        .filter-section {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 1.25rem;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          white-space: nowrap;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none; /* Hide Firefox scrollbar */
+          animation: fadeIn 0.8s ease 0.7s both;
+        }
+
+        .filter-section::-webkit-scrollbar {
+          display: none; /* Hide Chrome/Safari scrollbars */
+        }
+
+        .filter-label {
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: var(--text-dim);
+          font-weight: 600;
+          margin-right: 0.25rem;
+          flex-shrink: 0;
+        }
+
+        .filter-chip {
+          padding: 0.4rem 1rem !important;
+          font-size: 0.75rem !important;
+          border-radius: 20px !important;
+          min-width: unset !important;
+          line-height: 1 !important;
+          flex-shrink: 0 !important;
+        }
+
+        #back-to-top {
+          display: none;
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 99;
+          border: 1px solid rgba(0, 242, 254, 0.3);
+          outline: none;
+          background: rgba(26, 58, 82, 0.85);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: #00f2fe;
+          cursor: pointer;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          font-size: 1.2rem;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          align-items: center;
+          justify-content: center;
+        }
+
+        #back-to-top:hover {
+          background: #00f2fe;
+          color: #0a1929;
+          box-shadow: 0 0 15px rgba(0, 242, 254, 0.6);
+          transform: translateY(-3px);
+        }
+
+        #back-to-top:active {
+          transform: scale(0.95);
+        }
+
+        th {
+          position: sticky;
+          top: 0;
+          background: var(--bg-light);
+          z-index: 10;
+        }
+
+        .records-table-container {
+          overflow: auto;
+          max-height: 65vh;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+        }
     </style>
 
 </head>
@@ -1268,13 +1352,21 @@
         </div>
     </div>
 
+    <!-- Status Filter Section -->
+    <div class="filter-section">
+        <span class="filter-label">Filter:</span>
+        <button class="choice-btn filter-chip active" id="filter-all-btn" onclick="setStatusFilter('ALL')">All</button>
+        <button class="choice-btn filter-chip" id="filter-inprogress-btn" onclick="setStatusFilter('In Progress')">In Progress</button>
+        <button class="choice-btn filter-chip" id="filter-complete-btn" onclick="setStatusFilter('Complete')">Complete</button>
+    </div>
+
     <!-- Show All Notice -->
     <div id="show-all-notice" style="display:none; background:rgba(0,168,168,0.08); border:1px solid var(--primary); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.8rem; color:var(--text-dim);">
         ℹ️ Showing last 100 records. To view older records, please use the search functionality.
     </div>
 
     <!-- Patient Records Table -->
-    <div style="overflow-x: auto;">
+    <div class="records-table-container">
         <table id="records-table">
             <thead>
             <tr>
@@ -1292,6 +1384,11 @@
             </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Load More Pagination -->
+    <div id="load-more-container" style="text-align: center; margin-top: 1.25rem; margin-bottom: 1.25rem; display: none;">
+        <button class="btn btn-secondary btn-small" id="load-more-btn" onclick="loadMoreRecords()" style="min-width: 140px; border-radius: 20px;">Load More</button>
     </div>
 </div>
 
@@ -2293,6 +2390,8 @@
     let currentUser = null;
     let searchActive = false;
     let showAllActive = false;
+    let statusFilter = 'ALL';
+    let recordsLimit = 20;
     let editingRecordId = null;
     let editingReportLinks = [];
     let currentPrescriptions = [];
@@ -2896,12 +2995,30 @@
       }
       searchActive = true;
       showAllActive = false;
+      recordsLimit = 20;
+      // Reset status filter visually
+      statusFilter = 'ALL';
+      const allBtn = document.getElementById('filter-all-btn');
+      const ipBtn = document.getElementById('filter-inprogress-btn');
+      const compBtn = document.getElementById('filter-complete-btn');
+      if (allBtn) allBtn.classList.add('active');
+      if (ipBtn) ipBtn.classList.remove('active');
+      if (compBtn) compBtn.classList.remove('active');
       loadRecords();
     }
 
     function clearSearch() {
       searchActive = false;
       showAllActive = true;
+      recordsLimit = 20;
+      // Reset status filter visually
+      statusFilter = 'ALL';
+      const allBtn = document.getElementById('filter-all-btn');
+      const ipBtn = document.getElementById('filter-inprogress-btn');
+      const compBtn = document.getElementById('filter-complete-btn');
+      if (allBtn) allBtn.classList.add('active');
+      if (ipBtn) ipBtn.classList.remove('active');
+      if (compBtn) compBtn.classList.remove('active');
       document.getElementById('search-input').value = '';
       loadRecords();
     }
@@ -3343,32 +3460,47 @@
       } else if (showAllActive) {
         const sorted = [...allRecords].sort((a, b) => new Date(b.dateOfVisit) - new Date(a.dateOfVisit));
         records = sorted.slice(0, 100);
-        if (allRecords.length <= 100) {
-          notice.innerHTML = `ℹ️ Showing last ${allRecords.length} records.`;
-        } else {
-          notice.innerHTML = `ℹ️ Showing last 100 records, please use the search functionality.`;
-        }
         notice.style.display = 'block';
       } else {
         records = allRecords.filter(r => isWithinLast15Days(r.dateOfVisit));
         notice.style.display = 'none';
       }
 
+      // Apply status filter if not 'ALL'
+      if (statusFilter !== 'ALL') {
+        records = records.filter(r => (r.status || 'In Progress') === statusFilter);
+      }
+
+      // Update the notice after status filtering to show accurate numbers
+      if (showAllActive) {
+        if (allRecords.length <= 100) {
+          notice.innerHTML = `ℹ️ Showing last ${records.length} records.`;
+        } else {
+          notice.innerHTML = `ℹ️ Showing last 100 records, please use the search functionality.`;
+        }
+      }
+
       const tbody = document.getElementById('records-body');
+      const loadMoreContainer = document.getElementById('load-more-container');
+
       if (records.length === 0) {
         tbody.innerHTML = `
           <tr>
             <td colspan="6" class="empty-state">
-              ${searchActive ? 'No matching records found for "' + searchTerm + '"' : 'No records in the last 15 days. Click "Show All" or use search to see older records.'}
+              ${searchActive ? 'No matching records found for "' + searchTerm + '"' : 'No records found matching the criteria.'}
             </td>
           </tr>
         `;
+        if (loadMoreContainer) loadMoreContainer.style.display = 'none';
         return;
       }
 
       records.sort((a, b) => new Date(b.dateOfVisit) - new Date(a.dateOfVisit));
 
-      tbody.innerHTML = records.map(record => `
+      // Slice the records according to current limit
+      const displayedRecords = records.slice(0, recordsLimit);
+
+      tbody.innerHTML = displayedRecords.map(record => `
         <tr class="record-row" onclick="viewRecordDetails(${record.id})" style="cursor: pointer;">
           <td style="text-align: center;">
             <span style="font-size: 1.5rem;">📋</span>
@@ -3390,6 +3522,29 @@
           </td>
         </tr>
       `).join('');
+
+      // Show/hide Load More container
+      if (loadMoreContainer) {
+        if (records.length > recordsLimit) {
+          loadMoreContainer.style.display = 'block';
+        } else {
+          loadMoreContainer.style.display = 'none';
+        }
+      }
+    }
+
+    function loadMoreRecords() {
+      recordsLimit += 20;
+      loadRecords();
+    }
+
+    function setStatusFilter(status) {
+      statusFilter = status;
+      document.getElementById('filter-all-btn').classList.toggle('active', status === 'ALL');
+      document.getElementById('filter-inprogress-btn').classList.toggle('active', status === 'In Progress');
+      document.getElementById('filter-complete-btn').classList.toggle('active', status === 'Complete');
+      recordsLimit = 20; // reset pagination limit when changing status filter
+      loadRecords();
     }
 
     async function viewRecordDetails(id) {
@@ -4150,7 +4305,68 @@
       document.getElementById('search-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') searchRecords();
       });
+
+      // Interactive Debounced Search
+      let searchTimeout = null;
+      document.getElementById('search-input').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          const searchTerm = this.value.trim();
+          if (searchTerm) {
+            searchActive = true;
+            showAllActive = false;
+            recordsLimit = 20; // reset limit on new search
+            // Reset status filter visually
+            statusFilter = 'ALL';
+            const allBtn = document.getElementById('filter-all-btn');
+            const ipBtn = document.getElementById('filter-inprogress-btn');
+            const compBtn = document.getElementById('filter-complete-btn');
+            if (allBtn) allBtn.classList.add('active');
+            if (ipBtn) ipBtn.classList.remove('active');
+            if (compBtn) compBtn.classList.remove('active');
+            loadRecords();
+          } else {
+            // When input is cleared, clear active search status and revert
+            searchActive = false;
+            recordsLimit = 20;
+            loadRecords();
+          }
+        }, 200);
+      });
+
+      // Floating Back to Top Button
+      const backToTopBtn = document.getElementById('back-to-top');
+      if (backToTopBtn) {
+        const checkScroll = function(el) {
+          if (el && el.scrollTop > 250) {
+            backToTopBtn.style.display = 'flex';
+          } else {
+            backToTopBtn.style.display = 'none';
+          }
+        };
+
+        window.addEventListener('scroll', function() {
+          checkScroll(document.documentElement || document.body);
+        });
+
+        const tableContainer = document.querySelector('.records-table-container');
+        if (tableContainer) {
+          tableContainer.addEventListener('scroll', function() {
+            checkScroll(this);
+          });
+        }
+
+        backToTopBtn.addEventListener('click', function() {
+          const tableContainer = document.querySelector('.records-table-container');
+          if (tableContainer && tableContainer.scrollTop > 0) {
+            tableContainer.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      }
     });
 </script>
+<!-- Back to Top Button -->
+<button id="back-to-top" title="Back to top" aria-label="Back to top">↑</button>
 </body>
 </html>
