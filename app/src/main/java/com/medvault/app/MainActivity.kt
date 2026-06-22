@@ -71,6 +71,13 @@ class MainActivity : AppCompatActivity() {
         private const val DATA_FILE = "patient_records.json"
     }
 
+    private class RemoteChangedException : Exception("REMOTE_CHANGED")
+
+    private data class DriveDataSnapshot(
+        val data: String?,
+        val revision: String?
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -286,12 +293,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun syncToCloud(dataJson: String) {
+        fun syncToCloud(dataJson: String, expectedRevision: String?) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    uploadToGoogleDrive(dataJson)
+                    uploadToGoogleDrive(dataJson, expectedRevision)
                     withContext(Dispatchers.Main) {
                         notifySyncComplete(true, "Data uploaded to Google Drive")
+                    }
+                } catch (e: RemoteChangedException) {
+                    withContext(Dispatchers.Main) {
+                        notifySyncComplete(false, "REMOTE_CHANGED")
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -700,11 +711,18 @@ class MainActivity : AppCompatActivity() {
             .build()
     }
 
-    private suspend fun uploadToGoogleDrive(dataJson: String) = withContext(Dispatchers.IO) {
+    private suspend fun uploadToGoogleDrive(dataJson: String, expectedRevision: String?) = withContext(Dispatchers.IO) {
         val service = driveService ?: throw Exception("Drive service not initialized")
 
         val folderId = getOrCreateFolder(service)
-        val existingFileId = findFile(service, folderId, DATA_FILE)
+        val existingFile = findFileMetadata(service, folderId, DATA_FILE)
+        val existingFileId = existingFile?.id
+        val currentRevision = existingFile?.let { driveRevisionToken(it) }
+        val expected = expectedRevision?.trim().orEmpty()
+
+        if (existingFileId != null && expected.isNotEmpty() && currentRevision != expected) {
+            throw RemoteChangedException()
+        }
 
         val content = com.google.api.client.http.ByteArrayContent(
             "application/json",
@@ -731,15 +749,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun downloadFromGoogleDrive(): String? = withContext(Dispatchers.IO) {
-        val service = driveService ?: return@withContext null
+    private suspend fun downloadFromGoogleDrive(): DriveDataSnapshot = withContext(Dispatchers.IO) {
+        val service = driveService ?: return@withContext DriveDataSnapshot(null, null)
 
         val folderId = getOrCreateFolder(service)
-        val fileId = findFile(service, folderId, DATA_FILE) ?: return@withContext null
+        val file = findFileMetadata(service, folderId, DATA_FILE)
+            ?: return@withContext DriveDataSnapshot(null, null)
 
         val outputStream = ByteArrayOutputStream()
-        service.files().get(fileId).executeMediaAndDownloadTo(outputStream)
-        outputStream.toString("UTF-8")
+        service.files().get(file.id).executeMediaAndDownloadTo(outputStream)
+        DriveDataSnapshot(outputStream.toString("UTF-8"), driveRevisionToken(file))
     }
 
     private fun getOrCreateFolder(
@@ -781,6 +800,24 @@ class MainActivity : AppCompatActivity() {
             .execute()
 
         return if (result.files.isNotEmpty()) result.files[0].id else null
+    }
+
+    private fun findFileMetadata(service: Drive, folderId: String, fileName: String): File? {
+        val result = service.files().list()
+            .setQ("name='${escapeDriveQueryValue(fileName)}' and '$folderId' in parents and trashed=false")
+            .setSpaces("drive")
+            .setOrderBy("modifiedTime desc")
+            .setFields("files(id, modifiedTime, version, headRevisionId)")
+            .execute()
+
+        return result.files.firstOrNull()
+    }
+
+    private fun driveRevisionToken(file: File): String {
+        val version = file.version?.toString().orEmpty()
+        val modifiedTime = file.modifiedTime?.toString().orEmpty()
+        val headRevisionId = file.headRevisionId.orEmpty()
+        return listOf(version, modifiedTime, headRevisionId).joinToString("|")
     }
 
     private fun notifyDriveReady(isReady: Boolean) {
@@ -950,10 +987,13 @@ class MainActivity : AppCompatActivity() {
             .ifBlank { "Report" }
     }
 
-    private fun notifyDataReceived(data: String?) {
+    private fun notifyDataReceived(snapshot: DriveDataSnapshot) {
+        val payload = JSONObject()
+            .put("data", snapshot.data ?: JSONObject.NULL)
+            .put("revision", snapshot.revision ?: JSONObject.NULL)
         runOnUiThread {
             webView.evaluateJavascript(
-                "if(typeof onDataReceived === 'function') onDataReceived(${JSONObject.quote(data)});",
+                "if(typeof onDataReceived === 'function') onDataReceived(${JSONObject.quote(payload.toString())});",
                 null
             )
         }

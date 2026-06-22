@@ -1502,6 +1502,11 @@
     var _lastUploadMeta = null;
     var _lastUploadPendingCount = 0;
     var _isUploadingReports = false;
+    var _lastDownloadedRevision = '';
+    var _remoteChangedRetryCount = 0;
+    var _MAX_REMOTE_CHANGED_RETRIES = 3;
+    var _postUploadVerificationPending = false;
+    var _postUploadVerificationRunning = false;
 
     // Stable device ID so each phone can identify itself in the lock field
     function _getDeviceId() {
@@ -1670,6 +1675,32 @@
     function _compactDeletedRecords(deletionMap) {
       return Object.keys(deletionMap).map(function(key) {
         return deletionMap[key];
+      });
+    }
+
+    function _normalizePatientMap(patientMap) {
+      if (Array.isArray(patientMap)) return patientMap;
+      if (patientMap && typeof patientMap === 'object') {
+        return Object.keys(patientMap).map(function(key) {
+          return patientMap[key];
+        }).filter(function(item) {
+          return item && item.name && item.id;
+        });
+      }
+      return [];
+    }
+
+    function _mergePatientMaps(remotePatientMap, localPatientMap) {
+      const merged = {};
+      _normalizePatientMap(remotePatientMap).concat(_normalizePatientMap(localPatientMap)).forEach(function(item) {
+        if (!item || !item.name || !item.id) return;
+        merged[String(item.name).trim().toLowerCase()] = {
+          name: item.name,
+          id: item.id
+        };
+      });
+      return Object.keys(merged).map(function(key) {
+        return merged[key];
       });
     }
 
@@ -1943,7 +1974,7 @@
         const allData = {
           records: records,
           deletedRecords: _compactDeletedRecords(deletionMap),
-          patientMap: await loadData('patient-id-map'),
+          patientMap: _normalizePatientMap(await loadData('patient-id-map')),
           lastSync: new Date().toISOString(),
           syncMeta: syncMeta,
           syncHistory: nextSyncHistory,
@@ -1966,7 +1997,7 @@
             _uploadInProgress = false;
             handleSyncFailure('timeout');
           }, 90000);
-          GoogleDrive.syncToCloud(dataJson);
+          GoogleDrive.syncToCloud(dataJson, _lastDownloadedRevision || '');
         } else {
           _uploadInProgress = false;
           showWarningMessage('Running in web mode - data saved locally only');
@@ -2000,19 +2031,61 @@
       }
       _uploadInProgress = false;
       if (success) {
+        _remoteChangedRetryCount = 0;
         _syncRetryCount = 0;
         await applyUploadedPendingSync();
         await recordSyncHistory(_lastUploadMeta);
         updateSyncStatus('synced', 'Last synced: ' + new Date().toLocaleTimeString());
         showSuccessMessage('✓ Synced to Google Drive');
+        schedulePostUploadVerification();
       } else {
-        handleSyncFailure(message);
+        if (message === 'REMOTE_CHANGED') {
+          handleRemoteChangedDuringUpload();
+        } else {
+          handleSyncFailure(message);
+        }
       }
     };
 
+    function schedulePostUploadVerification() {
+      if (_postUploadVerificationRunning) {
+        _postUploadVerificationRunning = false;
+        return;
+      }
+      if (_postUploadVerificationPending || !GoogleDriveSync.isSignedIn()) return;
+      _postUploadVerificationPending = true;
+      setTimeout(function() {
+        _postUploadVerificationPending = false;
+        if (!GoogleDriveSync.isSignedIn() || typeof GoogleDrive === 'undefined') return;
+        _postUploadVerificationRunning = true;
+        updateSyncStatus('syncing', 'Verifying Drive sync...');
+        GoogleDrive.syncFromCloud();
+      }, 2500);
+    }
+
     // Retry the full sync (download→upload) on failure so Android re-caches the
     // Drive file ID before the next upload attempt. Resets after 3 failures.
+    function handleRemoteChangedDuringUpload() {
+      if (_remoteChangedRetryCount < _MAX_REMOTE_CHANGED_RETRIES) {
+        _remoteChangedRetryCount++;
+        updateSyncStatus('syncing', 'Drive changed. Merging latest data...');
+        if (typeof GoogleDrive !== 'undefined') {
+          GoogleDrive.syncFromCloud();
+          if (window._syncFallbackTimer) clearTimeout(window._syncFallbackTimer);
+          window._syncFallbackTimer = setTimeout(function() {
+            window._syncFallbackTimer = null;
+            handleSyncFailure('remote changed retry timeout');
+          }, 45000);
+        }
+      } else {
+        _remoteChangedRetryCount = 0;
+        updateSyncStatus('offline', 'Sync conflict needs retry');
+        showWarningMessage('Drive changed several times during sync. Tap Sync Now again.');
+      }
+    }
+
     function handleSyncFailure(reason) {
+      _postUploadVerificationRunning = false;
       if (_syncRetryCount < 3) {
         _syncRetryCount++;
         updateSyncStatus('syncing', 'Retrying sync (' + _syncRetryCount + '/3)...');
@@ -2033,13 +2106,23 @@
         window._syncFallbackTimer = null;
       }
       // No file in Drive yet — upload local data to create it
-      if (!dataJson || dataJson === 'null' || dataJson.trim() === '') {
-        updateSyncStatus('syncing', 'Uploading to Google Drive...');
-        GoogleDriveSync.uploadData();
-        return;
-      }
       try {
-        const data = JSON.parse(dataJson);
+        var parsedPayload = (!dataJson || dataJson === 'null' || dataJson.trim() === '')
+          ? null
+          : JSON.parse(dataJson);
+        var dataText = dataJson;
+        if (parsedPayload && Object.prototype.hasOwnProperty.call(parsedPayload, 'data')) {
+          _lastDownloadedRevision = parsedPayload.revision || '';
+          dataText = parsedPayload.data || '';
+        } else {
+          _lastDownloadedRevision = '';
+        }
+        if (!dataText || dataText === 'null' || String(dataText).trim() === '') {
+          updateSyncStatus('syncing', 'Uploading to Google Drive...');
+          GoogleDriveSync.uploadData();
+          return;
+        }
+        const data = typeof dataText === 'string' ? JSON.parse(dataText) : dataText;
         recordSyncHistory(data.syncMeta, data.syncHistory);
 
         // --- Distributed lock check ---
@@ -2133,7 +2216,8 @@
       await saveData('patient-deleted-records', _compactDeletedRecords(deletionMap));
 
       if (remoteData.patientMap) {
-        await saveData('patient-id-map', remoteData.patientMap);
+        const localPatientMap = await loadData('patient-id-map');
+        await saveData('patient-id-map', _mergePatientMaps(remoteData.patientMap, localPatientMap));
       }
 
       if (conflictCount > 0) {
@@ -2266,7 +2350,7 @@
     }
 
     async function getOrCreatePatientId(patientName) {
-      const patientMap = await loadData('patient-id-map');
+      const patientMap = _normalizePatientMap(await loadData('patient-id-map'));
       const existing = patientMap.find(p => p.name === patientName);
       if (existing) {
         return existing.id;
@@ -2278,7 +2362,7 @@
     }
 
     async function getPatientNames() {
-      const patientMap = await loadData('patient-id-map');
+      const patientMap = _normalizePatientMap(await loadData('patient-id-map'));
       return patientMap.map(p => p.name);
     }
 
