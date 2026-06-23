@@ -27,6 +27,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -148,6 +150,9 @@ class MainActivity : AppCompatActivity() {
         
         // Add JavaScript interface for Google Drive
         webView.addJavascriptInterface(GoogleDriveInterface(), "GoogleDrive")
+
+        // Add JavaScript interface for Biometrics
+        webView.addJavascriptInterface(BiometricInterface(), "BiometricAuth")
 
         // Set WebView client
         webView.webViewClient = object : WebViewClient() {
@@ -432,6 +437,58 @@ class MainActivity : AppCompatActivity() {
                 .edit()
                 .remove(key)
                 .apply()
+        }
+    }
+
+    inner class BiometricInterface {
+        @JavascriptInterface
+        fun isBiometricAvailable(): Boolean {
+            val biometricManager = BiometricManager.from(this@MainActivity)
+            val allowed = BiometricManager.Authenticators.BIOMETRIC_STRONG
+            return biometricManager.canAuthenticate(allowed) == BiometricManager.BIOMETRIC_SUCCESS
+        }
+
+        @JavascriptInterface
+        fun authenticate() {
+            runOnUiThread {
+                showBiometricPrompt()
+            }
+        }
+    }
+
+    private fun showBiometricPrompt() {
+        val executor = ContextCompat.getMainExecutor(this)
+        val biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    notifyBiometricStatus(false, errString.toString())
+                }
+
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    notifyBiometricStatus(true, "Authentication succeeded")
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    notifyBiometricStatus(false, "Authentication failed")
+                }
+            })
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("MedVault Secure Unlock")
+            .setSubtitle("Log in using biometric authentication")
+            .setNegativeButtonText("Use PIN / OTP")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    private fun notifyBiometricStatus(success: Boolean, message: String) {
+        webView.post {
+            webView.evaluateJavascript("javascript:onBiometricResult($success, '$message')", null)
         }
     }
 

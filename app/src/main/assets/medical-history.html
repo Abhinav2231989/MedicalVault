@@ -312,6 +312,63 @@
           animation: fadeSlideUp 0.6s ease;
         }
 
+        .login-box.shake {
+          animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-8px); }
+          40%, 80% { transform: translateX(8px); }
+        }
+
+        .login-sub-view {
+          display: block;
+          transition: opacity 0.3s ease;
+        }
+
+        .login-sub-view.hidden {
+          display: none;
+          opacity: 0;
+        }
+
+        #glowing-fingerprint-btn:hover, #glowing-fingerprint-btn:active {
+          box-shadow: 0 0 30px var(--primary);
+          transform: scale(1.05);
+        }
+
+        .biometric-icon {
+          width: 48px;
+          height: 48px;
+          display: block;
+          color: currentColor;
+          filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.35));
+        }
+
+        .fingerprint-glow {
+          position: absolute;
+          top: -2px;
+          left: -2px;
+          right: -2px;
+          bottom: -2px;
+          border-radius: 50%;
+          border: 2px solid var(--primary);
+          animation: fingerprint-ripple 2s infinite ease-out;
+          pointer-events: none;
+          opacity: 0;
+        }
+
+        @keyframes fingerprint-ripple {
+          0% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1.4);
+            opacity: 0;
+          }
+        }
+
         .login-error, .success-message, .warning-message {
           padding: 0.75rem;
           border-radius: 6px;
@@ -358,6 +415,37 @@
           flex-wrap: wrap;
           align-items: center;
           box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .search-controls {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          gap: 0.6rem;
+          width: 100%;
+          align-items: center;
+        }
+
+        .add-record-row {
+          width: 100%;
+          margin-top: 0.85rem;
+          padding-top: 0.95rem;
+          border-top: 1px solid rgba(144, 202, 249, 0.16);
+        }
+
+        .btn-add-record {
+          width: 100%;
+          min-height: 38px;
+          border-radius: 20px !important;
+          background: linear-gradient(135deg, #00f2fe, #4facfe) !important;
+          color: #052131 !important;
+          border: 1px solid rgba(178, 247, 255, 0.7) !important;
+          box-shadow: 0 8px 18px rgba(0, 168, 168, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+          font-weight: 800 !important;
+        }
+
+        .btn-add-record:active {
+          transform: translateY(1px);
+          filter: brightness(0.96);
         }
 
         .search-box input {
@@ -989,6 +1077,11 @@
             gap: 0.75rem !important;
           }
 
+          .search-controls {
+            grid-template-columns: 1fr;
+            gap: 0.65rem;
+          }
+
           .search-box input,
           .search-box button {
             width: 100%;
@@ -997,6 +1090,11 @@
 
           .search-box button {
             padding: 0.75rem 1rem;
+          }
+
+          .add-record-row {
+            margin-top: 1rem;
+            padding-top: 1.1rem;
           }
         }
 
@@ -1274,32 +1372,136 @@
           border-radius: 12px;
           border: 1px solid var(--border);
         }
-    </style>
 
+        /* Biometric welcome view premium styling and animations */
+        #glowing-fingerprint-btn {
+          outline: none;
+        }
+        #glowing-fingerprint-btn:hover {
+          transform: scale(1.05);
+          box-shadow: 0 0 30px rgba(0, 168, 168, 0.6);
+          color: #fff !important;
+          border-color: #fff !important;
+        }
+        #glowing-fingerprint-btn:active {
+          transform: scale(0.95);
+        }
+        .fingerprint-glow {
+          position: absolute;
+          top: -2px;
+          left: -2px;
+          right: -2px;
+          bottom: -2px;
+          border: 2px solid var(--primary);
+          border-radius: 50%;
+          animation: fingerprint-ripple 2s infinite ease-out;
+          pointer-events: none;
+        }
+        @keyframes fingerprint-ripple {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+            box-shadow: 0 0 0 0 rgba(0, 168, 168, 0.7);
+          }
+          100% {
+            transform: scale(1.4);
+            opacity: 0;
+            box-shadow: 0 0 0 15px rgba(0, 168, 168, 0);
+          }
+        }
+    </style>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
 <!-- Login Screen -->
-<div id="login-screen" class="login-container">
+<div id="login-screen" class="login-container" style="position: relative;">
     <div class="login-box">
         <h1 style="margin-bottom: 0.5rem;">MedVault</h1>
         <p class="subtitle" style="margin-bottom: 2rem;">Secure Medical Records</p>
 
-        <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" id="login-name" placeholder="Enter your full name">
+        <!-- Screen A: Biometric Welcome View -->
+        <div id="login-biometric-welcome-view" class="login-sub-view" style="display: none; text-align: center; padding: 1rem 0;">
+            <div style="font-size: 3.5rem; margin-bottom: 0.5rem; filter: drop-shadow(0 2px 8px rgba(0, 168, 168, 0.3));">👤</div>
+            <h2 id="biometric-welcome-name" style="font-family: 'Syne', sans-serif; font-size: 1.35rem; color: #fff; margin-bottom: 0.25rem; font-weight: 700;">Welcome</h2>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 2.25rem; letter-spacing: 0.5px;">SECURE MEDICAL PORTAL</p>
+            
+            <!-- Glowing Fingerprint Button Container -->
+            <div style="margin-bottom: 2.5rem; position: relative; display: inline-block;">
+                <button type="button" onclick="startBiometricLogin()" id="glowing-fingerprint-btn" style="position: relative; background: radial-gradient(circle, rgba(0, 168, 168, 0.2) 0%, rgba(19, 47, 76, 0.6) 100%); border: 2px solid var(--primary); border-radius: 50%; width: 90px; height: 90px; font-size: 2.5rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 0 20px rgba(0, 168, 168, 0.3);">
+                    <svg class="biometric-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                        <path d="M18.6 18.1C22.1 14.9 26.8 13 32 13s9.9 1.9 13.4 5.1" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                        <path d="M13.9 27.9C16.1 19.8 23.4 14 32 14s15.9 5.8 18.1 13.9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+                        <path d="M21.3 27.6C23.1 23.3 27.3 20.4 32 20.4s8.9 2.9 10.7 7.2" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                        <path d="M18.2 37.4v-4.3C18.2 25.5 24.4 19.3 32 19.3s13.8 6.2 13.8 13.8v2.1c0 3.6-2.9 6.5-6.5 6.5s-6.5-2.9-6.5-6.5v-4.3" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                        <path d="M25.5 33.1c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5v2.1" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                        <path d="M25.5 40.2c1.7 6.6 7.7 10.9 14.1 9.9" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                        <path d="M32 34.9c0 7.5 5.1 13.7 12 15.4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                        <path d="M18.7 45.8c2.7 5.1 7.6 8.7 13.3 9.7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+                    </svg>
+                    <span class="fingerprint-glow"></span>
+                </button>
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">Tap to Scan</div>
+            </div>
+            
+            <div style="margin-top: 1rem; border-top: 1px dashed rgba(46, 82, 102, 0.4); padding-top: 1.5rem;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="switchToFormLogin()" style="border: 1px solid var(--border); background: rgba(19, 47, 76, 0.3); color: var(--text-dim); text-transform: none; letter-spacing: 0.5px; border-radius: 20px; font-size: 0.75rem; padding: 0.55rem 1.35rem; font-family: inherit;">
+                    Use PIN & Email OTP instead
+                </button>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>PIN</label>
-            <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6">
+        <!-- Screen B: Traditional Form Login -->
+        <div id="login-credentials-view" class="login-sub-view" style="display: none;">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="login-name" placeholder="Enter your full name">
+            </div>
+
+            <div class="form-group">
+                <label>PIN</label>
+                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                    <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6" style="width: 100%; padding-right: 40px;">
+                    <button type="button" id="toggle-pin-btn" onclick="togglePinVisibility()" style="position: absolute; right: 10px; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; outline: none; padding: 0; line-height: 1;">👁️</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="login-email" placeholder="Enter your email address">
+            </div>
+
+            <button id="send-otp-btn" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" onclick="sendOtp()">Send OTP</button>
+
+            <!-- Back to Biometric welcome link (shown only if biometric available) -->
+            <div id="back-to-biometric-container" style="display: none; text-align: center; margin-top: 1.25rem;">
+                <a href="#" onclick="showBiometricWelcomeView(); return false;" style="color: var(--primary); text-decoration: none; font-size: 0.75rem; font-weight: bold; border-bottom: 1px dashed var(--primary); padding-bottom: 2px;">← Back to Biometric Unlock</a>
+            </div>
+        </div>
+
+        <!-- Stage 2: OTP Verification Input -->
+        <div id="login-otp-view" class="login-sub-view" style="display: none;">
+            <div class="form-group">
+                <label>Enter 6-Digit OTP</label>
+                <input type="text" id="login-otp-code" placeholder="Enter OTP code" maxlength="6" style="text-align: center; letter-spacing: 0.5rem; font-size: 1.25rem;">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 1.5rem; padding: 0 4px;">
+                <span id="otp-timer-text" style="color: var(--text-dim);">Resend OTP in 30s</span>
+                <a href="#" id="resend-otp-link" onclick="resendOtp(); return false;" style="color: var(--primary); text-decoration: none; display: none; font-weight: bold;">Resend OTP</a>
+            </div>
+
+            <button id="verify-otp-btn" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" onclick="verifyOtp()">Verify & Login</button>
+
+            <div style="text-align: center; margin-top: 1rem;">
+                <a href="#" onclick="showCredentialsView(); return false;" style="color: var(--text-dim); text-decoration: none; font-size: 0.75rem; border-bottom: 1px dashed var(--border); padding-bottom: 2px;">← Back to Credentials</a>
+            </div>
         </div>
 
         <div id="login-error" class="login-error"></div>
 
-        <button class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" onclick="login()">Login</button>
-
-        <div style="text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 1rem;">
+        <div style="text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 1.5rem; border-top: 1px solid rgba(46, 82, 102, 0.3); padding-top: 1rem;">
             ☁️ Multi-user sync via Google Drive<br>
+            📧 Free Email OTP Verification<br>
             🎤 Voice input support
         </div>
     </div>
@@ -1343,12 +1545,15 @@
 
     <!-- Search Bar and Add Button -->
     <div class="search-section">
-        <div class="search-box" style="gap: 0.5rem;">
-            <input type="text" id="search-input" placeholder="Search by Name or Phone or Disease (partial match supported)..." style="flex: 1; min-width: 200px; margin-right: 0.5rem;">
-            <button class="btn btn-primary btn-small" onclick="searchRecords()">Search</button>
-            <button class="btn btn-secondary btn-small" onclick="clearSearch()">Show All</button>
-            <div style="flex: 1;"></div>
-            <button class="btn btn-primary btn-small" onclick="showAddForm()" style="white-space: nowrap;">+ Add Patient Record</button>
+        <div class="search-box">
+            <div class="search-controls">
+                <input type="text" id="search-input" placeholder="Search by Name or Phone or Disease (partial match supported)...">
+                <button class="btn btn-primary btn-small" onclick="searchRecords()">Search</button>
+                <button class="btn btn-secondary btn-small" onclick="clearSearch()">Show All</button>
+            </div>
+            <div class="add-record-row">
+                <button class="btn btn-primary btn-small btn-add-record" onclick="showAddForm()">+ Add Patient Record</button>
+            </div>
         </div>
     </div>
 
@@ -2471,23 +2676,258 @@
       datalist.innerHTML = names.map(name => `<option value="${name}">`).join('');
     }
 
-    function login() {
+    // EmailJS Configuration - Enter your values here for real Email OTP
+    const EMAILJS_PUBLIC_KEY = "qL3MAypqd-Oa4bkqh"; // Enter your EmailJS Public Key
+    const EMAILJS_SERVICE_ID = "service_uzlmobe"; // Enter your EmailJS Service ID
+    const EMAILJS_TEMPLATE_ID = "template_srnqchb"; // Enter your EmailJS Template ID
+
+    let generatedOtpCode = null;
+    let otpTimerInterval = null;
+    let otpSecondsRemaining = 30;
+
+    function togglePinVisibility() {
+      const pinInput = document.getElementById('login-pin');
+      const toggleBtn = document.getElementById('toggle-pin-btn');
+      if (pinInput.type === 'password') {
+        pinInput.type = 'text';
+        toggleBtn.textContent = '🙈';
+      } else {
+        pinInput.type = 'password';
+        toggleBtn.textContent = '👁️';
+      }
+    }
+
+    function triggerCardShake() {
+      const box = document.querySelector('.login-box');
+      if (box) {
+        box.classList.remove('shake');
+        void box.offsetWidth; // Trigger reflow
+        box.classList.add('shake');
+        setTimeout(() => box.classList.remove('shake'), 400);
+      }
+    }
+
+    function showDemoOtpNotification(otp) {
+      const existing = document.getElementById('demo-otp-banner');
+      if (existing) existing.remove();
+
+      const banner = document.createElement('div');
+      banner.id = 'demo-otp-banner';
+      banner.style.position = 'absolute';
+      banner.style.top = '10px';
+      banner.style.left = '50%';
+      banner.style.transform = 'translateX(-50%)';
+      banner.style.background = 'linear-gradient(135deg, #132f4c, #0a1929)';
+      banner.style.border = '1px solid var(--primary)';
+      banner.style.borderRadius = '8px';
+      banner.style.padding = '12px 20px';
+      banner.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5), 0 0 10px rgba(0, 168, 168, 0.3)';
+      banner.style.color = '#fff';
+      banner.style.fontSize = '0.85rem';
+      banner.style.zIndex = '9999';
+      banner.style.width = '90%';
+      banner.style.maxWidth = '360px';
+      banner.style.textAlign = 'center';
+      banner.style.animation = 'fadeSlideUp 0.4s ease';
+
+      banner.innerHTML = `
+        <div style="font-weight: bold; color: var(--primary); margin-bottom: 4px;">💬 SYSTEM NOTIFICATION (DEMO MODE)</div>
+        <div>Your verification code is <strong style="font-size: 1.1rem; color: #ff6b6b; font-family: monospace; letter-spacing: 2px;">${otp}</strong></div>
+        <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 6px;">Configure EmailJS credentials in code to send real emails.</div>
+      `;
+
+      document.getElementById('login-screen').appendChild(banner);
+
+      setTimeout(() => {
+        if (banner.parentNode) banner.parentNode.removeChild(banner);
+      }, 15000);
+    }
+
+    function showOtpView() {
+      document.getElementById('login-credentials-view').style.display = 'none';
+      document.getElementById('login-otp-view').style.display = 'block';
+      document.getElementById('login-otp-code').value = '';
+      document.getElementById('login-otp-code').focus();
+      startOtpTimer();
+    }
+
+    function showCredentialsView() {
+      if (otpTimerInterval) {
+        clearInterval(otpTimerInterval);
+      }
+      document.getElementById('login-biometric-welcome-view').style.display = 'none';
+      document.getElementById('login-credentials-view').style.display = 'block';
+      document.getElementById('login-otp-view').style.display = 'none';
+      
+      const banner = document.getElementById('demo-otp-banner');
+      if (banner) banner.remove();
+    }
+
+    function startOtpTimer() {
+      if (otpTimerInterval) clearInterval(otpTimerInterval);
+      otpSecondsRemaining = 30;
+      const timerText = document.getElementById('otp-timer-text');
+      const resendLink = document.getElementById('resend-otp-link');
+      
+      timerText.style.display = 'inline';
+      resendLink.style.display = 'none';
+      timerText.textContent = `Resend OTP in ${otpSecondsRemaining}s`;
+
+      otpTimerInterval = setInterval(() => {
+        otpSecondsRemaining--;
+        if (otpSecondsRemaining <= 0) {
+          clearInterval(otpTimerInterval);
+          timerText.style.display = 'none';
+          resendLink.style.display = 'inline';
+        } else {
+          timerText.textContent = `Resend OTP in ${otpSecondsRemaining}s`;
+        }
+      }, 1000);
+    }
+
+    function sendOtp() {
       const name = document.getElementById('login-name').value.trim();
       const pin = document.getElementById('login-pin').value.trim();
+      const email = document.getElementById('login-email').value.trim();
+
       if (!name) {
         showLoginError('Please enter your full name');
+        triggerCardShake();
+        return;
+      }
+      if (!pin) {
+        showLoginError('Please enter your PIN');
+        triggerCardShake();
         return;
       }
       if (pin !== CORRECT_PIN) {
         showLoginError('Invalid PIN. Access denied.');
+        triggerCardShake();
         return;
       }
+      if (!email) {
+        showLoginError('Please enter your email address');
+        triggerCardShake();
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showLoginError('Please enter a valid email address');
+        triggerCardShake();
+        return;
+      }
+
+      generatedOtpCode = String(Math.floor(100000 + Math.random() * 900000));
+      console.log('Generated OTP:', generatedOtpCode);
+
+      const sendBtn = document.getElementById('send-otp-btn');
+      const originalText = sendBtn.textContent;
+      sendBtn.textContent = 'Sending OTP...';
+      sendBtn.disabled = true;
+
+      if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID) {
+        // Fallback to Demo Mode
+        setTimeout(() => {
+          sendBtn.textContent = originalText;
+          sendBtn.disabled = false;
+          showDemoOtpNotification(generatedOtpCode);
+          showOtpView();
+        }, 1000);
+      } else {
+        if (typeof emailjs !== 'undefined') {
+          emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+          emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            to_name: name,
+            email: email,
+            passcode: generatedOtpCode
+          })
+          .then(function() {
+            sendBtn.textContent = originalText;
+            sendBtn.disabled = false;
+            showSuccessMessage('OTP sent to ' + email);
+            showOtpView();
+          })
+          .catch(function(error) {
+            sendBtn.textContent = originalText;
+            sendBtn.disabled = false;
+            showLoginError('Failed to send email: ' + (error.text || error.message || error));
+            triggerCardShake();
+          });
+        } else {
+          sendBtn.textContent = originalText;
+          sendBtn.disabled = false;
+          showDemoOtpNotification(generatedOtpCode);
+          showOtpView();
+        }
+      }
+    }
+
+    function resendOtp() {
+      const email = document.getElementById('login-email').value.trim();
+      const name = document.getElementById('login-name').value.trim();
+      
+      generatedOtpCode = String(Math.floor(100000 + Math.random() * 900000));
+      console.log('Resent OTP:', generatedOtpCode);
+
+      if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID) {
+        showDemoOtpNotification(generatedOtpCode);
+        showSuccessMessage('New demo OTP generated');
+        startOtpTimer();
+      } else {
+        if (typeof emailjs !== 'undefined') {
+          emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            to_name: name,
+            email: email,
+            passcode: generatedOtpCode
+          })
+          .then(function() {
+            showSuccessMessage('New OTP sent to ' + email);
+            startOtpTimer();
+          })
+          .catch(function(error) {
+            showLoginError('Failed to resend: ' + (error.text || error.message || error));
+          });
+        }
+      }
+    }
+
+    function verifyOtp() {
+      const userCode = document.getElementById('login-otp-code').value.trim();
+      if (!userCode) {
+        showLoginError('Please enter the 6-digit verification code');
+        triggerCardShake();
+        return;
+      }
+      if (userCode !== generatedOtpCode) {
+        showLoginError('Invalid verification code. Access denied.');
+        triggerCardShake();
+        return;
+      }
+
+      completeLogin();
+    }
+
+    function completeLogin() {
+      const name = document.getElementById('login-name').value.trim();
+      const email = document.getElementById('login-email').value.trim();
+      
       currentUser = name;
       if (typeof AndroidStorage !== 'undefined') {
         AndroidStorage.setItem('medvault_user', name);
+        AndroidStorage.setItem('medvault_user_email', email);
+        AndroidStorage.setItem('medvault_last_user', name);
+        AndroidStorage.setItem('medvault_last_user_email', email);
       } else {
         localStorage.setItem('medvault_user', name);
+        localStorage.setItem('medvault_user_email', email);
+        localStorage.setItem('medvault_last_user', name);
+        localStorage.setItem('medvault_last_user_email', email);
       }
+      
+      const banner = document.getElementById('demo-otp-banner');
+      if (banner) banner.remove();
+      if (otpTimerInterval) clearInterval(otpTimerInterval);
+
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('main-app').style.display = 'block';
       document.getElementById('user-info').textContent = `Logged in as: ${name}`;
@@ -2495,7 +2935,6 @@
       initVoiceRecognition();
       bindVoiceButtons();
 
-      // Initialize autocomplete for diagnosis and medicines
       handleAutocomplete('diagnosis', commonDiagnoses);
       handleAutocomplete('medicines', commonMedicines);
       handleAutocomplete('prescription-medicine', commonMedicines);
@@ -2519,6 +2958,88 @@
         GoogleDriveSync.downloadData();
       }
     }
+
+    function showBiometricWelcomeView() {
+      document.getElementById('login-biometric-welcome-view').style.display = 'block';
+      document.getElementById('login-credentials-view').style.display = 'none';
+      document.getElementById('login-otp-view').style.display = 'none';
+    }
+
+    function switchToFormLogin() {
+      document.getElementById('login-biometric-welcome-view').style.display = 'none';
+      document.getElementById('login-credentials-view').style.display = 'block';
+      document.getElementById('login-otp-view').style.display = 'none';
+    }
+
+    function checkBiometricAvailability() {
+      var savedLastUser;
+      if (typeof AndroidStorage !== 'undefined') {
+        savedLastUser = AndroidStorage.getItem('medvault_last_user');
+      } else {
+        savedLastUser = localStorage.getItem('medvault_last_user');
+      }
+      
+      var savedLastEmail;
+      if (typeof AndroidStorage !== 'undefined') {
+        savedLastEmail = AndroidStorage.getItem('medvault_last_user_email');
+      } else {
+        savedLastEmail = localStorage.getItem('medvault_last_user_email');
+      }
+      
+      const hasBiometric = typeof BiometricAuth !== 'undefined' && BiometricAuth.isBiometricAvailable();
+      
+      if (savedLastUser && hasBiometric) {
+        // Pre-fill fields for traditional form switcher
+        document.getElementById('login-name').value = savedLastUser;
+        document.getElementById('login-email').value = savedLastEmail || '';
+        document.getElementById('biometric-welcome-name').textContent = savedLastUser;
+        
+        // Show back to biometric trigger link in form view
+        const backToBioContainer = document.getElementById('back-to-biometric-container');
+        if (backToBioContainer) backToBioContainer.style.display = 'block';
+
+        // Render biometric screen as default gateway
+        showBiometricWelcomeView();
+      } else {
+        const backToBioContainer = document.getElementById('back-to-biometric-container');
+        if (backToBioContainer) backToBioContainer.style.display = 'none';
+        
+        showCredentialsView();
+      }
+    }
+
+    function startBiometricLogin() {
+      if (typeof BiometricAuth !== 'undefined') {
+        BiometricAuth.authenticate();
+      }
+    }
+
+    window.onBiometricResult = function(success, message) {
+      if (success) {
+        var lastUser, lastEmail;
+        if (typeof AndroidStorage !== 'undefined') {
+          lastUser = AndroidStorage.getItem('medvault_last_user');
+          lastEmail = AndroidStorage.getItem('medvault_last_user_email');
+        } else {
+          lastUser = localStorage.getItem('medvault_last_user');
+          lastEmail = localStorage.getItem('medvault_last_user_email');
+        }
+
+        if (lastUser) {
+          document.getElementById('login-name').value = lastUser;
+          document.getElementById('login-email').value = lastEmail || '';
+          completeLogin();
+          showSuccessMessage('✓ Logged in via Biometrics');
+        } else {
+          showLoginError('No user history found. Please log in manually.');
+        }
+      } else {
+        if (message !== 'Authentication failed') {
+          showLoginError('Biometric verification: ' + message);
+          triggerCardShake();
+        }
+      }
+    };
 
     function logout(isAutoLogout) {
       if (isAutoLogout) {
@@ -2562,13 +3083,22 @@
       currentUser = null;
       if (typeof AndroidStorage !== 'undefined') {
         AndroidStorage.removeItem('medvault_user');
+        AndroidStorage.removeItem('medvault_user_email');
       } else {
         localStorage.removeItem('medvault_user');
+        localStorage.removeItem('medvault_user_email');
       }
-      document.getElementById('login-screen').style.display = 'flex';
-      document.getElementById('main-app').style.display = 'none';
+
+      // Clear fields before checking biometrics
       document.getElementById('login-name').value = '';
       document.getElementById('login-pin').value = '';
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-otp-code').value = '';
+
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('main-app').style.display = 'none';
+      
+      checkBiometricAvailability();
     }
 
     function showLoginError(message) {
@@ -4296,10 +4826,20 @@
             updateSyncStatus('offline', 'Working offline - Click to sync');
           }
         }, 1000);
+      } else {
+        checkBiometricAvailability();
       }
 
       document.getElementById('login-pin').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') login();
+        if (e.key === 'Enter') sendOtp();
+      });
+
+      document.getElementById('login-email').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendOtp();
+      });
+
+      document.getElementById('login-otp-code').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') verifyOtp();
       });
 
       document.getElementById('search-input').addEventListener('keypress', (e) => {
