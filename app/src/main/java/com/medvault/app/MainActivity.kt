@@ -222,6 +222,47 @@ class MainActivity : AppCompatActivity() {
                 }
                 return true
             }
+
+            override fun onJsConfirm(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: JsResult?
+            ): Boolean {
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("MedVault")
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        result?.confirm()
+                    }
+                    .setNegativeButton(android.R.string.cancel) { _, _ ->
+                        result?.cancel()
+                    }
+                    .setOnCancelListener {
+                        result?.cancel()
+                    }
+                    .show()
+                return true
+            }
+
+            override fun onJsAlert(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: JsResult?
+            ): Boolean {
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("MedVault")
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        result?.confirm()
+                    }
+                    .setOnCancelListener {
+                        result?.confirm()
+                    }
+                    .show()
+                return true
+            }
         }
 
         // Load the HTML file

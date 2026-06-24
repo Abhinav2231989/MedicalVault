@@ -2624,10 +2624,19 @@
       vehicle: 'Pills'
     };
     let inactivityTimer = null;
-    let lastActivityTime = Date.now();
+    let lastActivityTime = 0;
 
     function resetInactivityTimer() {
-      lastActivityTime = Date.now();
+      const now = Date.now();
+      // Throttle writing to local storage / Android preferences to once every 5 seconds
+      if (now - lastActivityTime >= 5000) {
+        if (typeof AndroidStorage !== 'undefined') {
+          AndroidStorage.setItem('medvault_last_activity_time', String(now));
+        } else {
+          localStorage.setItem('medvault_last_activity_time', String(now));
+        }
+      }
+      lastActivityTime = now;
 
       if (inactivityTimer) {
         clearTimeout(inactivityTimer);
@@ -2658,6 +2667,19 @@
             resetInactivityTimer();
           }
         }, true);
+      });
+
+      // Handle app background/foreground transitions
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && currentUser) {
+          let lastActStr = typeof AndroidStorage !== 'undefined' ? AndroidStorage.getItem('medvault_last_activity_time') : localStorage.getItem('medvault_last_activity_time');
+          let lastAct = lastActStr ? parseInt(lastActStr, 10) : lastActivityTime;
+          if (Date.now() - lastAct >= AUTO_LOGOUT_TIME) {
+            autoLogout();
+          } else {
+            resetInactivityTimer();
+          }
+        }
       });
     }
 
@@ -4816,6 +4838,15 @@
       }
 
       if (savedUser) {
+        // Check for persistent inactivity on load
+        let lastActStr = typeof AndroidStorage !== 'undefined' ? AndroidStorage.getItem('medvault_last_activity_time') : localStorage.getItem('medvault_last_activity_time');
+        let lastAct = lastActStr ? parseInt(lastActStr, 10) : Date.now();
+        if (Date.now() - lastAct >= AUTO_LOGOUT_TIME) {
+          performLogout();
+          showWarningMessage('⚠ Session expired due to inactivity. Please login again.');
+          return;
+        }
+
         currentUser = savedUser;
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
