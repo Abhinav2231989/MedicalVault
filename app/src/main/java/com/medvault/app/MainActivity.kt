@@ -1,6 +1,7 @@
 package com.medvault.app
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
 import android.content.ContentValues
@@ -437,6 +438,13 @@ class MainActivity : AppCompatActivity() {
                 .edit()
                 .remove(key)
                 .apply()
+        }
+
+        @JavascriptInterface
+        fun exitApp() {
+            runOnUiThread {
+                this@MainActivity.finish()
+            }
         }
     }
 
@@ -1083,11 +1091,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("MissingSuperCall")
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
+        webView.evaluateJavascript(
+            "javascript:if(typeof handleHardwareBack === 'function') { handleHardwareBack(); } else { AndroidStorage.exitApp(); }",
+            null
+        )
     }
 }

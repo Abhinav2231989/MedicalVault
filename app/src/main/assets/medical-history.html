@@ -1096,6 +1096,23 @@
             margin-top: 1rem;
             padding-top: 1.1rem;
           }
+
+          /* Optimize filter section on mobile to prevent cut-off */
+          .filter-section {
+            gap: 0.35rem !important;
+            margin-bottom: 1rem !important;
+            padding-right: 1.5rem !important;
+          }
+
+          .filter-chip {
+            padding: 0.35rem 0.75rem !important;
+            font-size: 0.7rem !important;
+          }
+
+          .filter-label {
+            font-size: 0.65rem !important;
+            margin-right: 0.15rem !important;
+          }
         }
 
         .autocomplete-container {
@@ -3061,6 +3078,7 @@
         </div>
       `;
       confirmMsg.classList.add('show');
+      confirmMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function cancelLogout() {
@@ -4905,6 +4923,69 @@
         });
       }
     });
+
+    window.handleHardwareBack = function() {
+      // 1. Check if any modals are open and close them first
+      const prescriptionModal = document.getElementById('prescription-modal');
+      if (prescriptionModal && (prescriptionModal.classList.contains('show') || prescriptionModal.style.display === 'flex' || prescriptionModal.style.display === 'block')) {
+        closePrescriptionModal();
+        return;
+      }
+      
+      const patientModal = document.getElementById('patient-modal');
+      if (patientModal && (patientModal.classList.contains('show') || patientModal.style.display === 'flex' || patientModal.style.display === 'block')) {
+        closeModal();
+        return;
+      }
+      
+      const detailModal = document.getElementById('detail-modal');
+      if (detailModal && (detailModal.classList.contains('show') || detailModal.style.display === 'flex' || detailModal.style.display === 'block')) {
+        closeDetailModal();
+        return;
+      }
+
+      // If warning message (logout confirmation) is visible, close it
+      const warningDiv = document.getElementById('warning-message');
+      if (warningDiv && warningDiv.classList.contains('show') && warningDiv.innerHTML.includes('confirmLogout()')) {
+        cancelLogout();
+        return;
+      }
+
+      // 2. Check if user is logged in (main app is visible)
+      if (currentUser) {
+        logout();
+        return;
+      }
+
+      // 3. If on login screen
+      const loginScreen = document.getElementById('login-screen');
+      if (loginScreen && (loginScreen.style.display === 'flex' || loginScreen.style.display === 'block')) {
+        // If on OTP view, go back to credentials view
+        const otpView = document.getElementById('login-otp-view');
+        if (otpView && otpView.style.display === 'block') {
+          showCredentialsView();
+          return;
+        }
+
+        // If on credentials view, check if we came from biometric welcome and go back to it
+        const credentialsView = document.getElementById('login-credentials-view');
+        const backToBioContainer = document.getElementById('back-to-biometric-container');
+        if (credentialsView && credentialsView.style.display === 'block' && backToBioContainer && backToBioContainer.style.display === 'block') {
+          showBiometricWelcomeView();
+          return;
+        }
+
+        // Otherwise, exit the app
+        if (typeof AndroidStorage !== 'undefined' && AndroidStorage.exitApp) {
+          AndroidStorage.exitApp();
+        }
+      } else {
+        // Safe fallback
+        if (typeof AndroidStorage !== 'undefined' && AndroidStorage.exitApp) {
+          AndroidStorage.exitApp();
+        }
+      }
+    };
 </script>
 <!-- Back to Top Button -->
 <button id="back-to-top" title="Back to top" aria-label="Back to top">↑</button>
