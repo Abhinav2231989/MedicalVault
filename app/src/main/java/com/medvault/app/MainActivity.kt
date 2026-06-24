@@ -817,6 +817,27 @@ class MainActivity : AppCompatActivity() {
             .build()
     }
 
+    private fun compressGzip(content: String): ByteArray {
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.GZIPOutputStream(bos).use { gzip ->
+            gzip.write(content.toByteArray(Charsets.UTF_8))
+        }
+        return bos.toByteArray()
+    }
+
+    private fun decompressGzip(bytes: ByteArray): String {
+        if (bytes.size < 2 || bytes[0] != 0x1f.toByte() || bytes[1] != 0x8b.toByte()) {
+            // Fallback for plain uncompressed JSON text
+            return bytes.toString(Charsets.UTF_8)
+        }
+        val bis = java.io.ByteArrayInputStream(bytes)
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.GZIPInputStream(bis).use { gzip ->
+            gzip.copyTo(bos)
+        }
+        return bos.toString("UTF-8")
+    }
+
     private suspend fun uploadToGoogleDrive(dataJson: String, expectedRevision: String?) = withContext(Dispatchers.IO) {
         val service = driveService ?: throw Exception("Drive service not initialized")
 
@@ -830,15 +851,17 @@ class MainActivity : AppCompatActivity() {
             throw RemoteChangedException()
         }
 
+        // Compress the JSON payload to gzip
+        val compressedBytes = compressGzip(dataJson)
         val content = com.google.api.client.http.ByteArrayContent(
-            "application/json",
-            dataJson.toByteArray()
+            "application/octet-stream",
+            compressedBytes
         )
 
         if (existingFileId != null) {
             val updateMetadata = File().apply {
                 name = DATA_FILE
-                mimeType = "application/json"
+                mimeType = "application/octet-stream"
             }
             service.files().update(existingFileId, updateMetadata, content)
                 .setFields("id")
@@ -846,7 +869,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             val createMetadata = File().apply {
                 name = DATA_FILE
-                mimeType = "application/json"
+                mimeType = "application/octet-stream"
                 parents = listOf(folderId)
             }
             service.files().create(createMetadata, content)
@@ -864,7 +887,11 @@ class MainActivity : AppCompatActivity() {
 
         val outputStream = ByteArrayOutputStream()
         service.files().get(file.id).executeMediaAndDownloadTo(outputStream)
-        DriveDataSnapshot(outputStream.toString("UTF-8"), driveRevisionToken(file))
+        
+        // Decompress, automatically falling back to plain UTF-8 if not gzipped
+        val decompressedJson = decompressGzip(outputStream.toByteArray())
+        
+        DriveDataSnapshot(decompressedJson, driveRevisionToken(file))
     }
 
     private fun getOrCreateFolder(
