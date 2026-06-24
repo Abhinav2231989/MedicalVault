@@ -506,6 +506,7 @@
         }
 
         input, textarea, select {
+          width: 100%;
           padding: 0.75rem;
           background: var(--bg-light);
           border: 1px solid var(--border);
@@ -514,6 +515,14 @@
           font-family: 'IBM Plex Mono', monospace;
           font-size: 0.85rem;
           transition: all 0.3s ease;
+        }
+
+        input[type="checkbox"] {
+          width: auto;
+          padding: 0;
+          background: transparent;
+          border: none;
+          box-shadow: none;
         }
 
         input:focus, textarea:focus, select:focus {
@@ -927,9 +936,12 @@
             font-weight: 600;
             color: #ffffff;
             padding: 0;
+            padding-right: 95px !important; /* Avoid overlap with absolute positioned status badge */
+            min-width: 0; /* Force grid item to shrink below min-content and wrap long words */
             text-align: left;
             border-bottom: none;
             letter-spacing: -0.5px;
+            word-break: break-word;
           }
 
           /* Column 3: Phone Number */
@@ -1435,6 +1447,7 @@
     <div class="login-box">
         <h1 style="margin-bottom: 0.5rem;">MedVault</h1>
         <p class="subtitle" style="margin-bottom: 2rem;">Secure Medical Records</p>
+        <div id="offline-login-msg" style="display: none; background: rgba(255, 152, 0, 0.15); border: 1px solid var(--warning); color: var(--warning); padding: 0.55rem; border-radius: 6px; font-size: 0.75rem; text-align: center; margin-bottom: 1.5rem; font-weight: bold; letter-spacing: 0.5px; animation: fadeSlideUp 0.3s ease;"></div>
 
         <!-- Screen A: Biometric Welcome View -->
         <div id="login-biometric-welcome-view" class="login-sub-view" style="display: none; text-align: center; padding: 1rem 0;">
@@ -1482,7 +1495,19 @@
                 </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" id="login-has-email-group">
+                <label>Do you have a email address?</label>
+                <div style="display: flex; gap: 2rem; margin-top: 0.5rem; align-items: center;">
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; margin-bottom: 0; font-size: 0.85rem; color: var(--text); font-weight: 500;">
+                        <input type="checkbox" id="email-yes-check" onchange="handleEmailCheckboxClick('yes')" style="width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary);"> Yes
+                    </label>
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; text-transform: none; margin-bottom: 0; font-size: 0.85rem; color: var(--text); font-weight: 500;">
+                        <input type="checkbox" id="email-no-check" onchange="handleEmailCheckboxClick('no')" style="width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary);"> No
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group" id="login-email-group">
                 <label>Email Address</label>
                 <input type="email" id="login-email" placeholder="Enter your email address">
             </div>
@@ -1813,6 +1838,70 @@
     };
 
     window.storage = storage;
+
+    function sha256(ascii) {
+      function rightRotate(value, amount) {
+        return (value >>> amount) | (value << (32 - amount));
+      }
+      var mathPow = Math.pow;
+      var maxWord = mathPow(2, 32);
+      var lengthProperty = 'length';
+      var i, j;
+      var result = '';
+      var words = [];
+      var asciiLength = ascii[lengthProperty];
+      var hash = sha256.h = sha256.h || [];
+      var k = sha256.k = sha256.k || [];
+      var primeCounter = k[lengthProperty];
+      var isComposite = {};
+      for (var candidate = 2; primeCounter < 64; candidate++) {
+        if (!isComposite[candidate]) {
+          for (i = 0; i < 313; i += candidate) {
+            isComposite[i] = candidate;
+          }
+          hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+          k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+        }
+      }
+      ascii += '\x80';
+      while (ascii[lengthProperty] % 64 - 56) {
+        ascii += '\x00';
+      }
+      for (i = 0; i < ascii[lengthProperty]; i++) {
+        j = ascii.charCodeAt(i);
+        if (j >> 8) return;
+        words[i >> 2] |= j << ((3 - i) % 4 * 8);
+      }
+      words[words[lengthProperty]] = ((asciiLength * 8) / maxWord) | 0;
+      words[words[lengthProperty]] = (asciiLength * 8) | 0;
+      for (j = 0; j < words[lengthProperty]; ) {
+        var w = words.slice(j, j += 16);
+        var oldHash = hash.slice(0);
+        hash = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+        for (i = 0; i < 64; i++) {
+          var w16 = w[i - 16], w15 = w[i - 15], w2 = w[i - 2], w7 = w[i - 7];
+          var s0 = rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3);
+          var s1 = rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10);
+          var temp1 = hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) +
+            ((hash[4] & hash[5]) ^ (~hash[4] & hash[6])) + k[i] +
+            (w[i] = (i < 16) ? w[i] : (w16 + s0 + w7 + s1) | 0);
+          var temp2 = (rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) +
+            ((hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]));
+          hash = [(temp1 + temp2) | 0].concat(hash);
+          hash[4] = (hash[4] + temp1) | 0;
+        }
+        for (i = 0; i < 8; i++) {
+          hash[i] = (hash[i] + oldHash[i]) | 0;
+        }
+      }
+      for (i = 0; i < 8; i++) {
+        for (var b = 3; b + 1; b--) {
+          var byteVal = (hash[i] >> (b * 8)) & 0xff;
+          result += ((byteVal < 16) ? '0' : '') + byteVal.toString(16);
+        }
+      }
+      return result;
+    }
 
     var _syncRetryCount = 0;
     var _uploadInProgress = false;
@@ -2607,9 +2696,10 @@
       }
     }, 300000);
 
-    const CORRECT_PIN = '258411';
+    const CORRECT_PIN_HASH = '6d3faf2d9677267626df363c379b5a08418c203af81cb9ea815e4afcc6104df1';
     const AUTO_LOGOUT_TIME = 30 * 60 * 1000;
     let currentUser = null;
+    let hasEmailAddress = true;
     let searchActive = false;
     let showAllActive = false;
     let statusFilter = 'ALL';
@@ -2655,6 +2745,54 @@
         setTimeout(() => {
           logout(true);
         }, 2000);
+      }
+    }
+
+    function handleEmailCheckboxClick(choice) {
+      setHasEmail(choice === 'yes');
+    }
+
+    function setHasEmail(hasEmail) {
+      hasEmailAddress = hasEmail;
+      const yesCheck = document.getElementById('email-yes-check');
+      const noCheck = document.getElementById('email-no-check');
+      const emailGroup = document.getElementById('login-email-group');
+      const sendBtn = document.getElementById('send-otp-btn');
+
+      if (hasEmail) {
+        if (yesCheck) yesCheck.checked = true;
+        if (noCheck) noCheck.checked = false;
+        if (emailGroup) emailGroup.style.display = 'block';
+        if (sendBtn) sendBtn.textContent = 'Send OTP';
+      } else {
+        if (yesCheck) yesCheck.checked = false;
+        if (noCheck) noCheck.checked = true;
+        if (emailGroup) emailGroup.style.display = 'none';
+        if (sendBtn) sendBtn.textContent = 'Login';
+      }
+    }
+
+    function updateConnectionStatus() {
+      const isOnline = navigator.onLine;
+      const hasEmailPromptGroup = document.getElementById('login-has-email-group');
+      const emailGroup = document.getElementById('login-email-group');
+      const sendBtn = document.getElementById('send-otp-btn');
+      const offlineMsg = document.getElementById('offline-login-msg');
+
+      if (!isOnline) {
+        if (hasEmailPromptGroup) hasEmailPromptGroup.style.display = 'none';
+        if (emailGroup) emailGroup.style.display = 'none';
+        if (sendBtn) sendBtn.textContent = 'Login';
+        if (offlineMsg) {
+          offlineMsg.style.display = 'block';
+          offlineMsg.textContent = 'Using offline login';
+        }
+      } else {
+        if (hasEmailPromptGroup) hasEmailPromptGroup.style.display = 'block';
+        if (offlineMsg) offlineMsg.style.display = 'none';
+        
+        // Restore based on user choice
+        setHasEmail(hasEmailAddress);
       }
     }
 
@@ -2827,7 +2965,6 @@
     function sendOtp() {
       const name = document.getElementById('login-name').value.trim();
       const pin = document.getElementById('login-pin').value.trim();
-      const email = document.getElementById('login-email').value.trim();
 
       if (!name) {
         showLoginError('Please enter your full name');
@@ -2839,11 +2976,31 @@
         triggerCardShake();
         return;
       }
-      if (pin !== CORRECT_PIN) {
+      if (sha256(pin) !== CORRECT_PIN_HASH) {
         showLoginError('Invalid PIN. Access denied.');
         triggerCardShake();
         return;
       }
+
+      const sendBtn = document.getElementById('send-otp-btn');
+      const originalText = sendBtn.textContent;
+
+      if (!hasEmailAddress || !navigator.onLine) {
+        sendBtn.textContent = 'Secure PIN login';
+        sendBtn.disabled = true;
+        const msg = !navigator.onLine 
+          ? '⚠️ Device is offline. Logging in via secure offline PIN bypass...'
+          : 'Logging in via secure PIN login...';
+        showWarningMessage(msg);
+        setTimeout(() => {
+          sendBtn.textContent = originalText;
+          sendBtn.disabled = false;
+          completeLogin();
+        }, 1500);
+        return;
+      }
+
+      const email = document.getElementById('login-email').value.trim();
       if (!email) {
         showLoginError('Please enter your email address');
         triggerCardShake();
@@ -2859,8 +3016,6 @@
       generatedOtpCode = String(Math.floor(100000 + Math.random() * 900000));
       console.log('Generated OTP:', generatedOtpCode);
 
-      const sendBtn = document.getElementById('send-otp-btn');
-      const originalText = sendBtn.textContent;
       sendBtn.textContent = 'Sending OTP...';
       sendBtn.disabled = true;
 
@@ -2887,10 +3042,15 @@
             showOtpView();
           })
           .catch(function(error) {
-            sendBtn.textContent = originalText;
-            sendBtn.disabled = false;
-            showLoginError('Failed to send email: ' + (error.text || error.message || error));
-            triggerCardShake();
+            console.error('Email send error:', error);
+            sendBtn.textContent = 'Secure PIN login';
+            sendBtn.disabled = true;
+            showWarningMessage('⚠️ Email OTP service is currently unavailable. Logging in via secure PIN bypass...');
+            setTimeout(() => {
+              sendBtn.textContent = originalText;
+              sendBtn.disabled = false;
+              completeLogin();
+            }, 1500);
           });
         } else {
           sendBtn.textContent = originalText;
@@ -4827,6 +4987,10 @@
     }
 
     window.addEventListener('load', () => {
+      window.addEventListener('online', updateConnectionStatus);
+      window.addEventListener('offline', updateConnectionStatus);
+      updateConnectionStatus();
+
       setupActivityListeners();
       bindReportInput();
 
