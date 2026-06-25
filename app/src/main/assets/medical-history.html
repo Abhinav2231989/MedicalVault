@@ -611,6 +611,12 @@
           font-size: 0.7rem;
         }
 
+        /* Hide the native datalist down arrow indicator */
+        #patient-name::-webkit-calendar-picker-indicator {
+          display: none !important;
+          -webkit-appearance: none;
+        }
+
         .voice-btn {
           position: absolute;
           right: 10px;
@@ -653,6 +659,108 @@
             transform: translateY(-50%) scale(1);
             box-shadow: 0 0 0 12px rgba(255, 74, 74, 0);
           }
+        }
+
+        /* Premium Voice Overlay & Visual Wave Feedback */
+        .voice-overlay {
+          display: none;
+          position: fixed;
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%) translateY(20px);
+          width: 90%;
+          max-width: 400px;
+          background: rgba(19, 47, 76, 0.85);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(0, 168, 168, 0.4);
+          border-radius: 16px;
+          padding: 1.25rem;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+          z-index: 2000;
+          opacity: 0;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .voice-overlay.show {
+          display: flex;
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+
+        .voice-wave-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          height: 36px;
+          margin-bottom: 0.25rem;
+        }
+
+        .voice-wave-bar {
+          width: 4px;
+          height: 8px;
+          background: var(--primary);
+          border-radius: 2px;
+          animation: wave-pulse 1.2s ease-in-out infinite;
+        }
+
+        .voice-wave-bar:nth-child(1) { height: 12px; animation-delay: 0.1s; }
+        .voice-wave-bar:nth-child(2) { height: 24px; animation-delay: 0.3s; }
+        .voice-wave-bar:nth-child(3) { height: 32px; animation-delay: 0.5s; background: #00f2fe; }
+        .voice-wave-bar:nth-child(4) { height: 18px; animation-delay: 0.2s; }
+        .voice-wave-bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+
+        @keyframes wave-pulse {
+          0%, 100% {
+            transform: scaleY(1);
+          }
+          50% {
+            transform: scaleY(1.8);
+          }
+        }
+
+        .voice-overlay-title {
+          font-family: 'Syne', sans-serif;
+          font-size: 0.8rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 1.5px;
+          color: var(--text-dim);
+          text-align: center;
+        }
+
+        .voice-overlay-interim {
+          font-size: 0.9rem;
+          color: var(--text);
+          text-align: center;
+          min-height: 48px;
+          max-height: 120px;
+          overflow-y: auto;
+          width: 100%;
+          line-height: 1.4;
+          font-style: italic;
+          padding: 0.5rem;
+          border-radius: 8px;
+          background: rgba(10, 25, 41, 0.4);
+          border: 1px solid rgba(46, 82, 102, 0.3);
+          word-break: break-word;
+        }
+
+        .voice-overlay-interim:empty::before {
+          content: 'Speak now...';
+          color: rgba(144, 202, 249, 0.5);
+          font-style: normal;
+        }
+
+        .voice-overlay-hint {
+          font-size: 0.65rem;
+          color: var(--text-dim);
+          opacity: 0.7;
+          margin-top: 0.25rem;
         }
 
         .input-with-voice {
@@ -1651,7 +1759,7 @@
             <div class="form-group">
                 <label>Patient Name <span style="color: var(--secondary);">*</span></label>
                 <div class="input-with-voice">
-                    <input type="text" id="patient-name" placeholder="e.g., John Doe" required list="patient-names-list">
+                    <input type="text" id="patient-name" placeholder="e.g., John Doe" required>
                     <button type="button" class="voice-btn" data-voice-field="patient-name" title="Hold to speak">🎤</button>
                 </div>
                 <datalist id="patient-names-list"></datalist>
@@ -2171,10 +2279,20 @@
           if (!field) return;
 
           let finalTranscript = '';
+          let interimTranscript = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcriptText = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript + ' ';
+              finalTranscript += transcriptText + ' ';
+            } else {
+              interimTranscript += transcriptText;
             }
+          }
+
+          // Visual Feedback: update interim text container in real-time
+          const interimEl = document.getElementById('voice-overlay-interim');
+          if (interimEl) {
+            interimEl.textContent = interimTranscript || '';
           }
 
           if (finalTranscript.trim()) {
@@ -2201,6 +2319,16 @@
             }
           } else {
             resetVoiceButtonState();
+            // Hide overlay if voice input is completed
+            const overlay = document.getElementById('voice-overlay');
+            if (overlay) {
+              overlay.classList.remove('show');
+              setTimeout(() => {
+                if (!isVoiceHoldActive) {
+                  overlay.style.display = 'none';
+                }
+              }, 300);
+            }
           }
         };
       }
@@ -2270,30 +2398,36 @@
       handleVoicePostProcess(field.id);
     }
 
+    function getFieldName(fieldId) {
+      if (fieldId === 'patient-name') return 'Patient Name';
+      if (fieldId === 'diagnosis') return 'Diagnosis';
+      if (fieldId === 'medicines') return 'Medicines';
+      if (fieldId === 'phone-number') return 'Phone Number';
+      if (fieldId === 'prescription-medicine') return 'Medicine Name';
+      if (fieldId === 'prescription-instructions') return 'Instructions';
+      return fieldId;
+    }
+
     function bindVoiceButtons() {
       document.querySelectorAll('.voice-btn[data-voice-field]').forEach(function(btn) {
         if (btn.dataset.voiceBound === 'true') return;
         btn.dataset.voiceBound = 'true';
 
-        btn.addEventListener('pointerdown', function(e) {
-          e.preventDefault();
-          startVoiceInput(btn.dataset.voiceField, btn);
-        });
-
-        btn.addEventListener('pointerup', function(e) {
-          e.preventDefault();
-          stopVoiceInput();
-        });
-
-        btn.addEventListener('pointercancel', stopVoiceInput);
-        btn.addEventListener('pointerleave', function() {
-          if (isVoiceHoldActive && currentVoiceButton === btn) {
-            stopVoiceInput();
-          }
-        });
-
         btn.addEventListener('click', function(e) {
           e.preventDefault();
+          e.stopPropagation();
+          const fieldId = btn.dataset.voiceField;
+
+          if (currentVoiceField === fieldId) {
+            // Already listening to this field, toggle off
+            stopVoiceInput();
+          } else {
+            // If listening to another field, stop first
+            if (currentVoiceField) {
+              stopVoiceInput();
+            }
+            startVoiceInput(fieldId, btn);
+          }
         });
       });
     }
@@ -2311,6 +2445,23 @@
       if (currentVoiceButton) {
         currentVoiceButton.classList.add('listening');
         currentVoiceButton.textContent = '🔴';
+      }
+
+      // Show the glassmorphic overlay
+      const overlay = document.getElementById('voice-overlay');
+      const overlayTitle = document.getElementById('voice-overlay-title');
+      const overlayInterim = document.getElementById('voice-overlay-interim');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        // force reflow
+        overlay.offsetHeight;
+        overlay.classList.add('show');
+      }
+      if (overlayTitle) {
+        overlayTitle.textContent = 'Listening to ' + getFieldName(fieldId) + '...';
+      }
+      if (overlayInterim) {
+        overlayInterim.textContent = '';
       }
 
       try {
@@ -2332,6 +2483,17 @@
         }
       }
       resetVoiceButtonState();
+
+      // Hide the overlay
+      const overlay = document.getElementById('voice-overlay');
+      if (overlay) {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+          if (!isVoiceHoldActive) {
+            overlay.style.display = 'none';
+          }
+        }, 300);
+      }
     }
 
     function resetVoiceButtonState() {
@@ -5184,5 +5346,20 @@
 </script>
 <!-- Back to Top Button -->
 <button id="back-to-top" title="Back to top" aria-label="Back to top">↑</button>
+
+<!-- Premium Voice Recognition Overlay -->
+<div id="voice-overlay" class="voice-overlay">
+    <div class="voice-wave-container">
+        <div class="voice-wave-bar"></div>
+        <div class="voice-wave-bar"></div>
+        <div class="voice-wave-bar"></div>
+        <div class="voice-wave-bar"></div>
+        <div class="voice-wave-bar"></div>
+    </div>
+    <div id="voice-overlay-title" class="voice-overlay-title">Listening...</div>
+    <div id="voice-overlay-interim" class="voice-overlay-interim"></div>
+    <button type="button" class="btn btn-primary btn-small" onclick="stopVoiceInput()" style="margin-top: 0.5rem; width: 100%; border-radius: 20px; font-weight: 700; background: var(--secondary) !important;">Stop Listening</button>
+    <div class="voice-overlay-hint">Tap the mic icon or "Stop Listening" to finish.</div>
+</div>
 </body>
 </html>
