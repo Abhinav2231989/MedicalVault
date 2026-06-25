@@ -2253,6 +2253,7 @@
     let currentVoiceButton = null;
     let isVoiceHoldActive = false;
     let shouldRestartVoiceRecognition = false;
+    let voiceSessionInitialValue = '';
 
     const voiceDiagnosisAliases = {
       'bp': 'Hypertension',
@@ -2307,7 +2308,7 @@
 
           let finalTranscript = '';
           let interimTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          for (let i = 0; i < event.results.length; i++) {
             const transcriptText = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
               finalTranscript += transcriptText + ' ';
@@ -2323,7 +2324,17 @@
           }
 
           if (finalTranscript.trim()) {
-            appendVoiceTranscript(field, finalTranscript.trim());
+            const cleanedSessionTranscript = cleanupVoiceTranscript(field.id, finalTranscript.trim());
+            if (field.id === 'phone-number') {
+              const digits = normalizePhoneTranscript(finalTranscript.trim());
+              field.value = (voiceSessionInitialValue + digits).replace(/\D/g, '').slice(0, 10);
+            } else {
+              field.value = voiceSessionInitialValue 
+                ? voiceSessionInitialValue + ' ' + cleanedSessionTranscript 
+                : cleanedSessionTranscript;
+            }
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            handleVoicePostProcess(field.id);
           }
         };
 
@@ -2469,6 +2480,10 @@
       currentVoiceButton = voiceBtn || document.querySelector('.voice-btn[data-voice-field="' + fieldId + '"]');
       isVoiceHoldActive = true;
       shouldRestartVoiceRecognition = true;
+      
+      const field = document.getElementById(fieldId);
+      voiceSessionInitialValue = field ? field.value : '';
+
       if (currentVoiceButton) {
         currentVoiceButton.classList.add('listening');
         currentVoiceButton.textContent = '🔴';
