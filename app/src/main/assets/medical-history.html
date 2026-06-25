@@ -756,11 +756,38 @@
           font-style: normal;
         }
 
-        .voice-overlay-hint {
-          font-size: 0.65rem;
+        /* Clearable Input Wrapper & Buttons */
+        .clearable-wrapper {
+          position: relative;
+          display: flex;
+          width: 100%;
+        }
+
+        .clear-btn {
+          position: absolute;
+          background: rgba(255, 255, 255, 0.15);
+          border: 1px solid rgba(46, 82, 102, 0.5);
+          border-radius: 50%;
           color: var(--text-dim);
-          opacity: 0.7;
-          margin-top: 0.25rem;
+          font-size: 1.15rem;
+          cursor: pointer;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          z-index: 10;
+          line-height: 1;
+          transition: all 0.2s ease;
+          padding: 0;
+          font-family: Arial, sans-serif;
+        }
+
+        .clear-btn:hover, .clear-btn:active {
+          color: white;
+          background: var(--secondary);
+          border-color: var(--secondary);
+          box-shadow: 0 0 8px rgba(255, 107, 107, 0.5);
         }
 
         .input-with-voice {
@@ -5148,11 +5175,90 @@
       }
     }
 
+    function setupClearButtons() {
+      const inputs = document.querySelectorAll(
+        'input[type="text"], input[type="search"], input[type="tel"], input[type="password"], input[type="email"], input[type="number"], textarea'
+      );
+
+      inputs.forEach(function(input) {
+        if (input.dataset.clearBound === 'true') return;
+        input.dataset.clearBound = 'true';
+
+        let container = input.parentNode;
+        const hasVoice = !!input.closest('.input-with-voice');
+
+        if (!container.classList.contains('input-with-voice') && !container.classList.contains('autocomplete-container')) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'clearable-wrapper';
+          if (input.id === 'search-input') {
+            wrapper.style.flex = '1';
+            wrapper.style.display = 'flex';
+          }
+          container.insertBefore(wrapper, input);
+          wrapper.appendChild(input);
+          container = wrapper;
+        }
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'clear-btn';
+        clearBtn.innerHTML = '&times;';
+        clearBtn.title = 'Clear value';
+
+        if (hasVoice) {
+          clearBtn.style.right = '48px';
+          input.style.paddingRight = '80px';
+        } else {
+          clearBtn.style.right = '10px';
+          input.style.paddingRight = '36px';
+        }
+
+        if (input.tagName.toLowerCase() === 'textarea') {
+          clearBtn.style.top = '20px';
+          clearBtn.style.transform = 'translateY(-50%)';
+        } else {
+          clearBtn.style.top = '50%';
+          clearBtn.style.transform = 'translateY(-50%)';
+        }
+
+        container.appendChild(clearBtn);
+
+        function toggleBtn() {
+          if (input.value.length > 0) {
+            clearBtn.style.display = 'inline-flex';
+          } else {
+            clearBtn.style.display = 'none';
+          }
+        }
+
+        input.addEventListener('input', toggleBtn);
+        input.addEventListener('focus', toggleBtn);
+
+        input.addEventListener('blur', function() {
+          setTimeout(function() {
+            clearBtn.style.display = 'none';
+          }, 200);
+        });
+
+        clearBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          input.value = '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.focus();
+          toggleBtn();
+        });
+
+        toggleBtn();
+      });
+    }
+
     window.addEventListener('load', () => {
       window.addEventListener('online', updateConnectionStatus);
       window.addEventListener('offline', updateConnectionStatus);
       updateConnectionStatus();
 
+      setupClearButtons();
       setupActivityListeners();
       bindReportInput();
 
