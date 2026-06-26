@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
     // File chooser support
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var selectedReportUris: List<Uri> = emptyList()
+    private var cameraImageUri: Uri? = null
     private val FILE_CHOOSER_REQUEST_CODE = 1
     private val PERMISSION_REQUEST_CODE = 100
     
@@ -99,7 +100,8 @@ class MainActivity : AppCompatActivity() {
         val permissions = arrayOf(
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA
         )
         
         val permissionsToRequest = permissions.filter {
@@ -113,6 +115,17 @@ class MainActivity : AppCompatActivity() {
                 PERMISSION_REQUEST_CODE
             )
         }
+    }
+
+    @Throws(java.io.IOException::class)
+    private fun createImageFile(): JavaFile {
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir: JavaFile = externalCacheDir ?: cacheDir
+        return JavaFile.createTempFile(
+            "JPEG_${timeStamp}_",
+            ".jpg",
+            storageDir
+        )
     }
 
     private fun setupGoogleSignIn() {
@@ -198,21 +211,65 @@ class MainActivity : AppCompatActivity() {
                 // Cancel any existing file chooser
                 this@MainActivity.filePathCallback?.onReceiveValue(null)
                 this@MainActivity.filePathCallback = filePathCallback
+                this@MainActivity.cameraImageUri = null
 
-                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                // Set up camera intent
+                var takePictureIntent: Intent? = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                if (takePictureIntent?.resolveActivity(packageManager) != null) {
+                    var photoFile: JavaFile? = null
+                    try {
+                        photoFile = createImageFile()
+                    } catch (ex: java.io.IOException) {
+                        android.util.Log.e("MainActivity", "Unable to create Image File", ex)
+                    }
+
+                    if (photoFile != null) {
+                        val authorities = "$packageName.fileprovider"
+                        val photoURI = FileProvider.getUriForFile(
+                            this@MainActivity,
+                            authorities,
+                            photoFile
+                        )
+                        this@MainActivity.cameraImageUri = photoURI
+                        takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                    } else {
+                        takePictureIntent = null
+                    }
+                } else {
+                    takePictureIntent = null
+                }
+
+                // Set up selection intent (document chooser)
+                val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
                     putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                 }
 
+                val intentArray: Array<Intent> = if (takePictureIntent != null) {
+                    arrayOf(takePictureIntent)
+                } else {
+                    emptyArray()
+                }
+
+                val chooserIntent = Intent(Intent.ACTION_CHOOSER).apply {
+                    putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
+                    putExtra(Intent.EXTRA_TITLE, "Select Source")
+                    putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray)
+                }
+
+                val useCameraDirectly = fileChooserParams?.isCaptureEnabled == true && takePictureIntent != null
+
                 try {
-                    startActivityForResult(
-                        Intent.createChooser(intent, "Select File"),
-                        FILE_CHOOSER_REQUEST_CODE
-                    )
+                    if (useCameraDirectly) {
+                        startActivityForResult(takePictureIntent!!, FILE_CHOOSER_REQUEST_CODE)
+                    } else {
+                        startActivityForResult(chooserIntent, FILE_CHOOSER_REQUEST_CODE)
+                    }
                     return true
                 } catch (e: Exception) {
                     this@MainActivity.filePathCallback = null
+                    this@MainActivity.cameraImageUri = null
                     Toast.makeText(this@MainActivity, "Cannot open file chooser", Toast.LENGTH_SHORT).show()
                     return false
                 }
@@ -302,6 +359,9 @@ class MainActivity : AppCompatActivity() {
                     } else if (data?.data != null) {
                         // Single file selected
                         arrayOf(data.data!!)
+                    } else if (cameraImageUri != null) {
+                        // Camera capture
+                        arrayOf(cameraImageUri!!)
                     } else {
                         null
                     }
@@ -312,6 +372,7 @@ class MainActivity : AppCompatActivity() {
                 selectedReportUris = results?.toList() ?: emptyList()
                 filePathCallback?.onReceiveValue(results)
                 filePathCallback = null
+                cameraImageUri = null // Reset camera image URI
             }
         }
     }
