@@ -140,6 +140,10 @@
           font-size: 0.7rem;
         }
 
+        #user-info.has-avatar::before {
+          content: none !important;
+        }
+
         .btn-logout {
           background: rgba(255, 107, 107, 0.1);
           color: var(--secondary);
@@ -385,15 +389,36 @@
         }
 
         .success-message {
-          background: rgba(76, 175, 80, 0.2);
-          color: var(--success);
+          background: rgba(76, 175, 80, 0.95);
+          color: white;
           border: 1px solid var(--success);
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 3000;
+          width: 90%;
+          max-width: 400px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
         }
 
         .warning-message {
-          background: rgba(255, 152, 0, 0.2);
-          color: var(--warning);
+          background: rgba(255, 152, 0, 0.95);
+          color: #0a1929;
           border: 1px solid var(--warning);
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 3000;
+          width: 90%;
+          max-width: 400px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          font-weight: 600;
         }
 
         .login-error.show, .success-message.show, .warning-message.show {
@@ -1571,8 +1596,56 @@
             transform: scale(1.4);
             opacity: 0;
             box-shadow: 0 0 0 15px rgba(0, 168, 168, 0);
-          }
         }
+      }
+
+      /* Settings Dropdown CSS styling */
+      .settings-dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .dropdown-menu-card {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        width: 180px;
+        background: rgba(19, 47, 76, 0.98);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.25rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        z-index: 2500;
+      }
+
+      .dropdown-menu-card.show {
+        display: block;
+      }
+
+      .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.85rem;
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.75rem;
+        transition: all 0.2s ease;
+        font-family: 'IBM Plex Mono', monospace;
+        text-transform: none;
+      }
+
+      .dropdown-item:hover {
+        background: rgba(0, 168, 168, 0.2);
+        color: #00f2fe;
+      }
+
+      .dropdown-item .item-icon {
+        font-size: 0.85rem;
+      }
     </style>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
@@ -1694,6 +1767,22 @@
             </div>
             <div class="header-meta">
                 <div id="user-info"></div>
+                <!-- Settings Dropdown Container -->
+                <div class="settings-dropdown" id="settings-menu-container" style="margin-bottom: 0.25rem;">
+                    <button type="button" class="btn-logout btn-dropdown-trigger" onclick="toggleSettingsDropdown(event)" title="Settings" style="background: rgba(0, 168, 168, 0.15); color: var(--primary); border: 1px solid rgba(0, 168, 168, 0.4); display: inline-flex; align-items: center; gap: 0.35rem; width: 100%; font-size: 0.7rem; padding: 0.4rem 0.8rem; font-family: 'Syne', sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 6px;">
+                        ⚙️ Settings ▼
+                    </button>
+                    
+                    <div class="dropdown-menu-card" id="settings-dropdown-menu">
+                        <a href="#" class="dropdown-item" onclick="openAiSettingsModal(); closeSettingsDropdown(); event.preventDefault();">
+                            <span class="item-icon">⚙️</span> AI Configuration
+                        </a>
+                        <a href="#" class="dropdown-item" onclick="triggerProfilePicUpload(); closeSettingsDropdown(); event.preventDefault();">
+                            <span class="item-icon">👤</span> Set Profile Picture
+                        </a>
+                    </div>
+                </div>
+                <input type="file" id="profile-pic-input" style="display: none;" accept="image/*" onchange="handleProfilePicUpload(event)">
                 <button class="btn-logout" onclick="logout()">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:2px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     Logout
@@ -1783,6 +1872,17 @@
         </div>
 
         <form id="patient-form" onsubmit="savePatientRecord(event)">
+            <!-- AI Assistance Section -->
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
+                <button type="button" class="btn btn-primary" id="ai-dictate-btn" onclick="startAiDictation()" style="flex: 1; background: linear-gradient(135deg, #a44cff, #4facfe) !important; border: 1px solid rgba(164, 76, 255, 0.4) !important; font-weight: 700; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; min-height: 38px;">
+                    🎤 AI Voice Assist
+                </button>
+                <button type="button" class="btn btn-primary" id="ai-upload-btn" onclick="triggerAiFileUpload()" style="flex: 1; background: linear-gradient(135deg, #6b11ff, #a44cff) !important; border: 1px solid rgba(164, 76, 255, 0.4) !important; font-weight: 700; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; min-height: 38px;">
+                    📁 AI File upload
+                </button>
+            </div>
+            <input type="file" id="ai-file-input" style="display: none;" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" onchange="handleAiFileUpload(event)">
+
             <div class="form-group">
                 <label>Patient Name <span style="color: var(--secondary);">*</span></label>
                 <div class="input-with-voice">
@@ -1904,6 +2004,26 @@
         </div>
 
         <button type="button" class="btn btn-primary" style="width: 100%;" onclick="savePrescriptionItem()">Save & Add to Prescription</button>
+    </div>
+</div>
+<!-- AI Settings Modal -->
+<div id="ai-settings-modal" class="modal" onclick="if(event.target===this)closeAiSettingsModal()">
+    <div class="modal-content" style="max-width: 420px; border-color: rgba(164, 76, 255, 0.4);">
+        <div class="modal-header">
+            <h2 class="modal-title" style="color: #a44cff;">AI Configuration</h2>
+            <button class="close-btn" onclick="closeAiSettingsModal()">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>Gemini API Key</label>
+            <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API Key" style="border-color: rgba(164, 76, 255, 0.3);">
+            <p style="font-size: 0.65rem; color: var(--text-dim); margin-top: 0.6rem; line-height: 1.3;">
+                Get a free API key from Google AI Studio. The key is stored locally on this device and is only used to connect directly to the Gemini API.
+            </p>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="button" class="btn btn-primary" onclick="saveAiSettings()" style="flex: 1; background: linear-gradient(135deg, #a44cff, #4facfe) !important;">Save Key</button>
+            <button type="button" class="btn btn-secondary" onclick="closeAiSettingsModal()" style="flex: 1;">Cancel</button>
+        </div>
     </div>
 </div>
 
@@ -2254,6 +2374,8 @@
     let isVoiceHoldActive = false;
     let shouldRestartVoiceRecognition = false;
     let voiceSessionInitialValue = '';
+    let isAiDictationMode = false;
+    let voiceSessionFinalTranscript = '';
 
     const voiceDiagnosisAliases = {
       'bp': 'Hypertension',
@@ -2304,7 +2426,8 @@
         recognition.onresult = function(event) {
           if (!currentVoiceField) return;
           const field = document.getElementById(currentVoiceField);
-          if (!field) return;
+          // Only resolve fields if not in AI mode
+          if (!isAiDictationMode && !field) return;
 
           let finalTranscript = '';
           let interimTranscript = '';
@@ -2324,17 +2447,21 @@
           }
 
           if (finalTranscript.trim()) {
-            const cleanedSessionTranscript = cleanupVoiceTranscript(field.id, finalTranscript.trim());
-            if (field.id === 'phone-number') {
-              const digits = normalizePhoneTranscript(finalTranscript.trim());
-              field.value = (voiceSessionInitialValue + digits).replace(/\D/g, '').slice(0, 10);
-            } else {
-              field.value = voiceSessionInitialValue 
-                ? voiceSessionInitialValue + ' ' + cleanedSessionTranscript 
-                : cleanedSessionTranscript;
+            voiceSessionFinalTranscript = finalTranscript.trim();
+            
+            if (!isAiDictationMode) {
+              const cleanedSessionTranscript = cleanupVoiceTranscript(field.id, finalTranscript.trim());
+              if (field.id === 'phone-number') {
+                const digits = normalizePhoneTranscript(finalTranscript.trim());
+                field.value = (voiceSessionInitialValue + digits).replace(/\D/g, '').slice(0, 10);
+              } else {
+                field.value = voiceSessionInitialValue 
+                  ? voiceSessionInitialValue + ' ' + cleanedSessionTranscript 
+                  : cleanedSessionTranscript;
+              }
+              field.dispatchEvent(new Event('input', { bubbles: true }));
+              handleVoicePostProcess(field.id);
             }
-            field.dispatchEvent(new Event('input', { bubbles: true }));
-            handleVoicePostProcess(field.id);
           }
         };
 
@@ -2357,15 +2484,17 @@
             }
           } else {
             resetVoiceButtonState();
-            // Hide overlay if voice input is completed
-            const overlay = document.getElementById('voice-overlay');
-            if (overlay) {
-              overlay.classList.remove('show');
-              setTimeout(() => {
-                if (!isVoiceHoldActive) {
-                  overlay.style.display = 'none';
-                }
-              }, 300);
+            // Hide overlay if voice input is completed and not in AI processing
+            if (!isAiDictationMode) {
+              const overlay = document.getElementById('voice-overlay');
+              if (overlay) {
+                overlay.classList.remove('show');
+                setTimeout(() => {
+                  if (!isVoiceHoldActive) {
+                    overlay.style.display = 'none';
+                  }
+                }, 300);
+              }
             }
           }
         };
@@ -2476,6 +2605,7 @@
         return;
       }
 
+      isAiDictationMode = false;
       currentVoiceField = fieldId;
       currentVoiceButton = voiceBtn || document.querySelector('.voice-btn[data-voice-field="' + fieldId + '"]');
       isVoiceHoldActive = true;
@@ -2483,6 +2613,7 @@
       
       const field = document.getElementById(fieldId);
       voiceSessionInitialValue = field ? field.value : '';
+      voiceSessionFinalTranscript = '';
 
       if (currentVoiceButton) {
         currentVoiceButton.classList.add('listening');
@@ -2515,8 +2646,14 @@
     }
 
     function stopVoiceInput() {
+      const wasAiMode = isAiDictationMode;
+      const transcript = voiceSessionFinalTranscript;
+
       isVoiceHoldActive = false;
       shouldRestartVoiceRecognition = false;
+      isAiDictationMode = false;
+      voiceSessionFinalTranscript = '';
+
       if (recognition) {
         try {
           recognition.stop();
@@ -2526,15 +2663,28 @@
       }
       resetVoiceButtonState();
 
-      // Hide the overlay
-      const overlay = document.getElementById('voice-overlay');
-      if (overlay) {
-        overlay.classList.remove('show');
-        setTimeout(() => {
-          if (!isVoiceHoldActive) {
-            overlay.style.display = 'none';
+      if (wasAiMode) {
+        if (transcript) {
+          processAiDictation(transcript);
+        } else {
+          showWarningMessage('No dictation captured. Please try again.');
+          const overlay = document.getElementById('voice-overlay');
+          if (overlay) {
+            overlay.classList.remove('show');
+            setTimeout(() => { overlay.style.display = 'none'; }, 300);
           }
-        }, 300);
+        }
+      } else {
+        // Hide the overlay
+        const overlay = document.getElementById('voice-overlay');
+        if (overlay) {
+          overlay.classList.remove('show');
+          setTimeout(() => {
+            if (!isVoiceHoldActive) {
+              overlay.style.display = 'none';
+            }
+          }, 300);
+        }
       }
     }
 
@@ -2543,6 +2693,12 @@
         btn.classList.remove('listening');
         btn.textContent = '🎤';
       });
+
+      const aiBtn = document.getElementById('ai-dictate-btn');
+      if (aiBtn) {
+        aiBtn.classList.remove('listening');
+        aiBtn.textContent = '✨AI Voice Assist';
+      }
 
       currentVoiceField = null;
       currentVoiceButton = null;
@@ -3333,7 +3489,7 @@
 
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('main-app').style.display = 'block';
-      document.getElementById('user-info').textContent = `Logged in as: ${name}`;
+      updateUserInfo(name);
 
       initVoiceRecognition();
       bindVoiceButtons();
@@ -3912,6 +4068,578 @@
       editingReportLinks = [];
       currentPrescriptions = [];
       stopVoiceInput();
+    }
+
+    /* AI Config & Settings Javascript API */
+    /* Settings Dropdown and Profile Picture Javascript API */
+    function toggleSettingsDropdown(event) {
+      if (event) {
+        event.stopPropagation();
+      }
+      const dropdown = document.getElementById('settings-dropdown-menu');
+      const container = document.getElementById('settings-menu-container');
+      if (dropdown && container) {
+        if (dropdown.classList.contains('show')) {
+          dropdown.classList.remove('show');
+          container.classList.remove('active');
+        } else {
+          dropdown.classList.add('show');
+          container.classList.add('active');
+        }
+      }
+    }
+
+    function closeSettingsDropdown() {
+      const dropdown = document.getElementById('settings-dropdown-menu');
+      const container = document.getElementById('settings-menu-container');
+      if (dropdown) dropdown.classList.remove('show');
+      if (container) container.classList.remove('active');
+    }
+
+    // Setup global click listener to close settings dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+      const container = document.getElementById('settings-menu-container');
+      if (container && !container.contains(event.target)) {
+        closeSettingsDropdown();
+      }
+    });
+
+    function triggerProfilePicUpload() {
+      const fileInput = document.getElementById('profile-pic-input');
+      if (fileInput) {
+        fileInput.value = ''; // reset selection
+        fileInput.click();
+      }
+    }
+
+    function handleProfilePicUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Limit file size to 2MB to keep local storage lightweight
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Profile picture size exceeds 2MB limit. Please select a smaller image.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function() {
+        const base64Data = reader.result;
+        
+        // Save to storage keyed by user
+        if (currentUser) {
+          const storageKey = 'medvault_profile_picture_' + currentUser;
+          if (typeof AndroidStorage !== 'undefined') {
+            AndroidStorage.setItem(storageKey, base64Data);
+          } else {
+            localStorage.setItem(storageKey, base64Data);
+          }
+          // Refresh user-info UI
+          updateUserInfo(currentUser);
+          showSuccessMessage('✓ Profile picture updated successfully!');
+        } else {
+          alert('No user currently logged in.');
+        }
+      };
+      reader.onerror = function(err) {
+        console.error('File read error:', err);
+        alert('Failed to read profile picture file.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updateUserInfo(username) {
+      const userInfo = document.getElementById('user-info');
+      if (!userInfo) return;
+      
+      if (!username) {
+        userInfo.textContent = '';
+        userInfo.style.display = 'none';
+        return;
+      }
+      
+      userInfo.innerHTML = '';
+      userInfo.style.display = 'inline-flex';
+      
+      // Load user-specific profile picture
+      let savedPic = '';
+      const storageKey = 'medvault_profile_picture_' + username;
+      if (typeof AndroidStorage !== 'undefined') {
+        savedPic = AndroidStorage.getItem(storageKey) || '';
+      } else {
+        savedPic = localStorage.getItem(storageKey) || '';
+      }
+      
+      if (savedPic) {
+        userInfo.classList.add('has-avatar');
+        const img = document.createElement('img');
+        img.className = 'user-avatar-img';
+        img.src = savedPic;
+        img.style.width = '18px';
+        img.style.height = '18px';
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+        img.style.marginRight = '6px';
+        img.style.border = '1px solid var(--primary)';
+        userInfo.appendChild(img);
+      } else {
+        userInfo.classList.remove('has-avatar');
+      }
+      
+      const textSpan = document.createElement('span');
+      textSpan.textContent = `Logged in as: ${username}`;
+      userInfo.appendChild(textSpan);
+    }
+
+    function openAiSettingsModal() {
+      const modal = document.getElementById('ai-settings-modal');
+      const keyInput = document.getElementById('gemini-api-key');
+      
+      let savedKey = '';
+      if (typeof AndroidStorage !== 'undefined') {
+        savedKey = AndroidStorage.getItem('medvault_gemini_api_key') || '';
+      } else {
+        savedKey = localStorage.getItem('medvault_gemini_api_key') || '';
+      }
+      
+      if (keyInput) keyInput.value = savedKey;
+      if (modal) {
+        modal.classList.add('show');
+      }
+    }
+
+    function closeAiSettingsModal() {
+      const modal = document.getElementById('ai-settings-modal');
+      if (modal) {
+        modal.classList.remove('show');
+      }
+    }
+
+    function saveAiSettings() {
+      const keyInput = document.getElementById('gemini-api-key');
+      const key = keyInput ? keyInput.value.trim() : '';
+      
+      if (typeof AndroidStorage !== 'undefined') {
+        AndroidStorage.setItem('medvault_gemini_api_key', key);
+      } else {
+        localStorage.setItem('medvault_gemini_api_key', key);
+      }
+      
+      showSuccessMessage('✓ AI Configuration saved successfully!');
+      closeAiSettingsModal();
+    }
+
+    function triggerAiFileUpload() {
+      let apiKey = '';
+      if (typeof AndroidStorage !== 'undefined') {
+        apiKey = AndroidStorage.getItem('medvault_gemini_api_key') || '';
+      } else {
+        apiKey = localStorage.getItem('medvault_gemini_api_key') || '';
+      }
+      
+      if (!apiKey) {
+        alert('Please configure your Gemini API Key in AI Config first.');
+        openAiSettingsModal();
+        return;
+      }
+      
+      const fileInput = document.getElementById('ai-file-input');
+      if (fileInput) {
+        fileInput.value = ''; // reset selection
+        fileInput.click();
+      }
+    }
+
+    function handleAiFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Limit file size to 5MB
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size exceeds the 5MB limit. Please select a smaller file.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function() {
+        const dataUrl = reader.result;
+        const commaIdx = dataUrl.indexOf(',');
+        const mimeType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
+        const base64Data = dataUrl.substring(commaIdx + 1);
+        
+        processAiDocument(mimeType, base64Data);
+      };
+      reader.onerror = function(err) {
+        console.error('File read error:', err);
+        alert('Failed to read the file.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function processAiDocument(mimeType, base64Data) {
+      const overlay = document.getElementById('voice-overlay');
+      const overlayTitle = document.getElementById('voice-overlay-title');
+      const overlayInterim = document.getElementById('voice-overlay-interim');
+      
+      // Open overlay to show AI spinner and analysis message
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.offsetHeight;
+        overlay.classList.add('show');
+      }
+      if (overlayTitle) {
+        overlayTitle.textContent = '✨ AI is analyzing document...';
+      }
+      if (overlayInterim) {
+        overlayInterim.textContent = 'Please wait while Gemini processes the uploaded file details...';
+      }
+
+      let apiKey = '';
+      if (typeof AndroidStorage !== 'undefined') {
+        apiKey = AndroidStorage.getItem('medvault_gemini_api_key') || '';
+      } else {
+        apiKey = localStorage.getItem('medvault_gemini_api_key') || '';
+      }
+
+      if (!apiKey) {
+        alert('Gemini API key is not configured.');
+        if (overlay) {
+          overlay.classList.remove('show');
+          setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+        return;
+      }
+
+      try {
+        const promptText = `Parse the uploaded clinical document/image and organize its details into a structured JSON object. Extract the patient's name, their 10-digit phone number, diagnosis details, prescribed medicine text, and structured prescriptions. If a value is not mentioned in the document, use an empty string. Ensure the phone number is strictly a string of 10 digits without any spaces or symbols.
+
+Response format MUST be a JSON object with this exact structure:
+{
+  "patientName": "...",
+  "phoneNumber": "...",
+  "diagnosis": "...",
+  "medicines": "...",
+  "prescriptions": [
+    {
+      "medicine": "...",
+      "potency": "...",
+      "scale": "...",
+      "scaleNumber": "...",
+      "duration": "...",
+      "vehicle": "...",
+      "instructions": "..."
+    }
+  ]
+}`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  text: promptText
+                },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
+            }],
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        if (!response.ok) {
+          let errDetail = '';
+          try {
+            errDetail = ' - ' + await response.text();
+          } catch (e) {}
+          throw new Error('Gemini API call failed with status: ' + response.status + errDetail);
+        }
+
+        const resData = await response.json();
+        if (!resData.candidates || !resData.candidates[0] || !resData.candidates[0].content || !resData.candidates[0].content.parts || !resData.candidates[0].content.parts[0]) {
+          throw new Error('Invalid response from Gemini API');
+        }
+
+        let outputJsonText = resData.candidates[0].content.parts[0].text;
+        if (outputJsonText && outputJsonText.includes('```')) {
+          outputJsonText = outputJsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+        }
+        const structuredData = JSON.parse(outputJsonText);
+
+        // Autofill form fields
+        if (structuredData.patientName) {
+          const nameInput = document.getElementById('patient-name');
+          if (nameInput) {
+            nameInput.value = structuredData.patientName;
+            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (structuredData.phoneNumber) {
+          const phoneInput = document.getElementById('phone-number');
+          if (phoneInput) {
+            phoneInput.value = String(structuredData.phoneNumber).replace(/\D/g, '').slice(0, 10);
+            phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (structuredData.diagnosis) {
+          const diagInput = document.getElementById('diagnosis');
+          if (diagInput) {
+            diagInput.value = structuredData.diagnosis;
+            diagInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (structuredData.medicines) {
+          const medsInput = document.getElementById('medicines');
+          if (medsInput) {
+            medsInput.value = structuredData.medicines;
+            medsInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (Array.isArray(structuredData.prescriptions)) {
+          // Normalize prescription objects
+          currentPrescriptions = structuredData.prescriptions.map(item => {
+            const medicineName = item.medicine || item.medicineName || item.name || '';
+            return {
+              medicine: medicineName,
+              potency: item.potency || 'ANY',
+              scale: item.scale || '',
+              scaleNumber: item.scaleNumber || '',
+              duration: item.duration || '',
+              vehicle: item.vehicle || 'Pills',
+              instructions: item.instructions || ''
+            };
+          });
+          renderPrescriptions();
+        }
+
+        showSuccessMessage('✨ AI parsed document details successfully!');
+      } catch (error) {
+        console.error('AI document processing error:', error);
+        showWarningMessage('⚠️ AI Service unavailable, please fill details manually');
+      } finally {
+        if (overlay) {
+          overlay.classList.remove('show');
+          setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+      }
+    }
+
+    function startAiDictation() {
+      let apiKey = '';
+      if (typeof AndroidStorage !== 'undefined') {
+        apiKey = AndroidStorage.getItem('medvault_gemini_api_key') || '';
+      } else {
+        apiKey = localStorage.getItem('medvault_gemini_api_key') || '';
+      }
+      
+      if (!apiKey) {
+        alert('Please configure your Gemini API Key in AI Config first.');
+        openAiSettingsModal();
+        return;
+      }
+      
+      if (!recognition) {
+        showWarningMessage('Voice input not supported in this browser');
+        return;
+      }
+      
+      isAiDictationMode = true;
+      currentVoiceField = 'patient-form'; // dummy field indicator
+      currentVoiceButton = document.getElementById('ai-dictate-btn');
+      isVoiceHoldActive = true;
+      shouldRestartVoiceRecognition = true;
+      voiceSessionInitialValue = '';
+      voiceSessionFinalTranscript = '';
+
+      if (currentVoiceButton) {
+        currentVoiceButton.classList.add('listening');
+        currentVoiceButton.textContent = '🔴 Listening to visit...';
+      }
+
+      // Show overlay with AI title
+      const overlay = document.getElementById('voice-overlay');
+      const overlayTitle = document.getElementById('voice-overlay-title');
+      const overlayInterim = document.getElementById('voice-overlay-interim');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.offsetHeight;
+        overlay.classList.add('show');
+      }
+      if (overlayTitle) {
+        overlayTitle.textContent = 'Listening to visit details for AI...';
+      }
+      if (overlayInterim) {
+        overlayInterim.textContent = '';
+      }
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error('Recognition start error:', e);
+        stopVoiceInput();
+      }
+    }
+
+    async function processAiDictation(transcript) {
+      const overlay = document.getElementById('voice-overlay');
+      const overlayTitle = document.getElementById('voice-overlay-title');
+      const overlayInterim = document.getElementById('voice-overlay-interim');
+      
+      // Open overlay to show AI spinner
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.offsetHeight;
+        overlay.classList.add('show');
+      }
+      if (overlayTitle) {
+        overlayTitle.textContent = '✨ AI is processing transcript...';
+      }
+      if (overlayInterim) {
+        overlayInterim.textContent = 'Please wait while Gemini structures your record...';
+      }
+
+      let apiKey = '';
+      if (typeof AndroidStorage !== 'undefined') {
+        apiKey = AndroidStorage.getItem('medvault_gemini_api_key') || '';
+      } else {
+        apiKey = localStorage.getItem('medvault_gemini_api_key') || '';
+      }
+
+      if (!apiKey) {
+        alert('Gemini API key is not configured.');
+        if (overlay) {
+          overlay.classList.remove('show');
+          setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+        return;
+      }
+
+      try {
+        const promptText = `Parse the following unstructured clinical visit dictation transcript and organize it into a structured JSON object. Extract the patient's name, their 10-digit phone number, diagnosis details, prescribed medicine text, and structured prescriptions. If a value is not mentioned in the transcript, use an empty string. Ensure the phone number is strictly a string of 10 digits without any spaces or symbols.
+
+Dictation: "${transcript}"
+
+Response format MUST be a JSON object with this exact structure:
+{
+  "patientName": "...",
+  "phoneNumber": "...",
+  "diagnosis": "...",
+  "medicines": "...",
+  "prescriptions": [
+    {
+      "medicine": "...",
+      "potency": "...",
+      "scale": "...",
+      "scaleNumber": "...",
+      "duration": "...",
+      "vehicle": "...",
+      "instructions": "..."
+    }
+  ]
+}`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: promptText
+              }]
+            }],
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        if (!response.ok) {
+          let errDetail = '';
+          try {
+            errDetail = ' - ' + await response.text();
+          } catch (e) {}
+          throw new Error('Gemini API call failed with status: ' + response.status + errDetail);
+        }
+
+        const resData = await response.json();
+        if (!resData.candidates || !resData.candidates[0] || !resData.candidates[0].content || !resData.candidates[0].content.parts || !resData.candidates[0].content.parts[0]) {
+          throw new Error('Invalid response from Gemini API');
+        }
+
+        let outputJsonText = resData.candidates[0].content.parts[0].text;
+        if (outputJsonText && outputJsonText.includes('```')) {
+          outputJsonText = outputJsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+        }
+        const structuredData = JSON.parse(outputJsonText);
+
+        // Autofill form fields
+        if (structuredData.patientName) {
+          const nameInput = document.getElementById('patient-name');
+          if (nameInput) {
+            nameInput.value = structuredData.patientName;
+            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (structuredData.phoneNumber) {
+          const phoneInput = document.getElementById('phone-number');
+          if (phoneInput) {
+            phoneInput.value = String(structuredData.phoneNumber).replace(/\D/g, '').slice(0, 10);
+            phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (structuredData.diagnosis) {
+          const diagInput = document.getElementById('diagnosis');
+          if (diagInput) {
+            diagInput.value = structuredData.diagnosis;
+            diagInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (structuredData.medicines) {
+          const medsInput = document.getElementById('medicines');
+          if (medsInput) {
+            medsInput.value = structuredData.medicines;
+            medsInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        if (Array.isArray(structuredData.prescriptions)) {
+          // Normalize prescription objects
+          currentPrescriptions = structuredData.prescriptions.map(item => {
+            const medicineName = item.medicine || item.medicineName || item.name || '';
+            return {
+              medicine: medicineName,
+              potency: item.potency || 'ANY',
+              scale: item.scale || '',
+              scaleNumber: item.scaleNumber || '',
+              duration: item.duration || '',
+              vehicle: item.vehicle || 'Pills',
+              instructions: item.instructions || ''
+            };
+          });
+          renderPrescriptions();
+        }
+
+        showSuccessMessage('✨ AI filled form fields successfully!');
+      } catch (error) {
+        console.error('AI dictation processing error:', error);
+        showWarningMessage('⚠️ AI Service unavailable, please fill details manually');
+      } finally {
+        if (overlay) {
+          overlay.classList.remove('show');
+          setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+      }
     }
 
     function isWithinLast15Days(dateString) {
@@ -5297,7 +6025,7 @@
         currentUser = savedUser;
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
-        document.getElementById('user-info').textContent = `Logged in as: ${savedUser}`;
+        updateUserInfo(savedUser);
 
         initVoiceRecognition();
         bindVoiceButtons();
@@ -5404,12 +6132,18 @@
 
     window.handleHardwareBack = function() {
       // 1. Check if any modals are open and close them first
+      const aiSettingsModal = document.getElementById('ai-settings-modal');
+      if (aiSettingsModal && (aiSettingsModal.classList.contains('show') || aiSettingsModal.style.display === 'flex' || aiSettingsModal.style.display === 'block')) {
+        closeAiSettingsModal();
+        return;
+      }
+
       const prescriptionModal = document.getElementById('prescription-modal');
       if (prescriptionModal && (prescriptionModal.classList.contains('show') || prescriptionModal.style.display === 'flex' || prescriptionModal.style.display === 'block')) {
         closePrescriptionModal();
         return;
       }
-      
+
       const patientModal = document.getElementById('patient-modal');
       if (patientModal && (patientModal.classList.contains('show') || patientModal.style.display === 'flex' || patientModal.style.display === 'block')) {
         closeModal();
