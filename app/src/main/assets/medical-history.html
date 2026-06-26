@@ -716,6 +716,11 @@
           transform: translateX(-50%) translateY(0);
         }
 
+        .voice-overlay.processing #voice-overlay-stop-btn,
+        .voice-overlay.processing .voice-overlay-hint {
+          display: none !important;
+        }
+
         .voice-wave-container {
           display: flex;
           align-items: center;
@@ -2719,6 +2724,7 @@
       const overlayTitle = document.getElementById('voice-overlay-title');
       const overlayInterim = document.getElementById('voice-overlay-interim');
       if (overlay) {
+        overlay.classList.remove('processing');
         overlay.style.display = 'flex';
         // force reflow
         overlay.offsetHeight;
@@ -4379,6 +4385,7 @@
       
       // Open overlay to show AI spinner and analysis message
       if (overlay) {
+        overlay.classList.add('processing');
         overlay.style.display = 'flex';
         overlay.offsetHeight;
         overlay.classList.add('show');
@@ -4387,7 +4394,7 @@
         overlayTitle.textContent = '✨ AI is analyzing document...';
       }
       if (overlayInterim) {
-        overlayInterim.textContent = 'Please wait while Gemini processes the uploaded file details...';
+        overlayInterim.textContent = 'Please wait while our AI Engine processes the uploaded file details...';
       }
 
       let apiKey = '';
@@ -4567,6 +4574,7 @@ Response format MUST be a JSON object with this exact structure:
       const overlayTitle = document.getElementById('voice-overlay-title');
       const overlayInterim = document.getElementById('voice-overlay-interim');
       if (overlay) {
+        overlay.classList.remove('processing');
         overlay.style.display = 'flex';
         overlay.offsetHeight;
         overlay.classList.add('show');
@@ -4594,6 +4602,7 @@ Response format MUST be a JSON object with this exact structure:
       
       // Open overlay to show AI spinner
       if (overlay) {
+        overlay.classList.add('processing');
         overlay.style.display = 'flex';
         overlay.offsetHeight;
         overlay.classList.add('show');
@@ -4602,7 +4611,7 @@ Response format MUST be a JSON object with this exact structure:
         overlayTitle.textContent = 'AI is processing the voice transcript. Please wait';
       }
       if (overlayInterim) {
-        overlayInterim.textContent = 'Please wait while AI structures your patient record...';
+        overlayInterim.textContent = 'Please wait while our AI Engine structures your patient record...';
       }
 
       let apiKey = '';
@@ -6312,7 +6321,7 @@ Response format MUST be a JSON object with this exact structure:
     </div>
     <div id="voice-overlay-title" class="voice-overlay-title">Listening...</div>
     <div id="voice-overlay-interim" class="voice-overlay-interim"></div>
-    <button type="button" class="btn btn-primary btn-small" onclick="stopVoiceInput()" style="margin-top: 0.5rem; width: 100%; border-radius: 20px; font-weight: 700; background: var(--secondary) !important;">Stop Listening</button>
+    <button type="button" id="voice-overlay-stop-btn" class="btn btn-primary btn-small" onclick="stopVoiceInput()" style="margin-top: 0.5rem; width: 100%; border-radius: 20px; font-weight: 700; background: var(--secondary) !important;">Stop Listening</button>
     <div class="voice-overlay-hint">Tap the mic icon or "Stop Listening" to finish.</div>
 </div>
 </body>
