@@ -824,6 +824,94 @@
           padding-right: 50px;
         }
 
+        .ai-intake-card {
+          margin-bottom: 1.25rem;
+          padding: 0.9rem;
+          border: 1px solid rgba(96, 157, 190, 0.5);
+          border-radius: 16px;
+          background: rgba(19, 47, 70, 0.72);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 28px rgba(0, 0, 0, 0.16);
+        }
+
+        .ai-intake-header {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding-bottom: 0.85rem;
+          margin-bottom: 0.85rem;
+          border-bottom: 1px solid rgba(96, 157, 190, 0.34);
+        }
+
+        .ai-intake-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          background: linear-gradient(135deg, #20e2f1, #45b7ff);
+          color: #062435;
+          font-size: 0.75rem;
+          font-weight: 900;
+          letter-spacing: 0.04em;
+        }
+
+        .ai-intake-title {
+          margin: 0;
+          color: var(--text);
+          font-size: 0.92rem;
+          font-weight: 800;
+          letter-spacing: 0.01em;
+          line-height: 1.15;
+        }
+
+        .ai-intake-subtitle {
+          margin: 0.18rem 0 0;
+          color: var(--text-dim);
+          font-size: 0.68rem;
+          line-height: 1.25;
+        }
+
+        .ai-intake-actions {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 0.65rem;
+        }
+
+        .ai-action-btn {
+          min-height: 38px;
+          padding: 0.55rem 0.75rem;
+          border-radius: 13px !important;
+          border: 1px solid rgba(148, 104, 255, 0.72) !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff !important;
+          font-size: 0.68rem;
+          font-weight: 900;
+          line-height: 1.1;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          white-space: normal;
+          text-align: center;
+        }
+
+        .ai-action-btn.voice {
+          background: linear-gradient(135deg, #8d62ff, #55c6ff) !important;
+          box-shadow: 0 8px 18px rgba(85, 198, 255, 0.18);
+        }
+
+        .ai-action-btn.file {
+          background: rgba(22, 48, 73, 0.86) !important;
+          box-shadow: inset 0 0 0 1px rgba(124, 70, 255, 0.2);
+        }
+
+        .ai-action-btn.listening {
+          background: linear-gradient(135deg, #ff4a4a, #ff7c7c) !important;
+          border-color: rgba(255, 122, 122, 0.85) !important;
+        }
+
         .modal {
           display: none;
           position: fixed;
@@ -1873,13 +1961,18 @@
 
         <form id="patient-form" onsubmit="savePatientRecord(event)">
             <!-- AI Assistance Section -->
-            <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
-                <button type="button" class="btn btn-primary" id="ai-dictate-btn" onclick="startAiDictation()" style="flex: 1; background: linear-gradient(135deg, #a44cff, #4facfe) !important; border: 1px solid rgba(164, 76, 255, 0.4) !important; font-weight: 700; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; min-height: 38px;">
-                    🎤 AI Voice Assist
-                </button>
-                <button type="button" class="btn btn-primary" id="ai-upload-btn" onclick="triggerAiFileUpload()" style="flex: 1; background: linear-gradient(135deg, #6b11ff, #a44cff) !important; border: 1px solid rgba(164, 76, 255, 0.4) !important; font-weight: 700; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; min-height: 38px;">
-                    📁 AI File upload
-                </button>
+            <div class="ai-intake-card">
+                <div class="ai-intake-header">
+                    <div class="ai-intake-icon">AI</div>
+                    <div>
+                        <h3 class="ai-intake-title">Smart Intake</h3>
+                        <p class="ai-intake-subtitle">Fill details from voice or document</p>
+                    </div>
+                </div>
+                <div class="ai-intake-actions">
+                    <button type="button" class="btn btn-primary ai-action-btn voice" id="ai-dictate-btn" onclick="startAiDictation()">Voice</button>
+                    <button type="button" class="btn btn-primary ai-action-btn file" id="ai-upload-btn" onclick="triggerAiFileUpload()">Upload File</button>
+                </div>
             </div>
             <input type="file" id="ai-file-input" style="display: none;" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" onchange="handleAiFileUpload(event)">
 
@@ -2375,6 +2468,7 @@
     let shouldRestartVoiceRecognition = false;
     let voiceSessionInitialValue = '';
     let isAiDictationMode = false;
+    let isAiProcessingVoiceTranscript = false;
     let voiceSessionFinalTranscript = '';
 
     const voiceDiagnosisAliases = {
@@ -2485,7 +2579,7 @@
           } else {
             resetVoiceButtonState();
             // Hide overlay if voice input is completed and not in AI processing
-            if (!isAiDictationMode) {
+            if (!isAiDictationMode && !isAiProcessingVoiceTranscript) {
               const overlay = document.getElementById('voice-overlay');
               if (overlay) {
                 overlay.classList.remove('show');
@@ -2648,10 +2742,12 @@
     function stopVoiceInput() {
       const wasAiMode = isAiDictationMode;
       const transcript = voiceSessionFinalTranscript;
+      const shouldProcessAiTranscript = wasAiMode && !!transcript;
 
       isVoiceHoldActive = false;
       shouldRestartVoiceRecognition = false;
       isAiDictationMode = false;
+      isAiProcessingVoiceTranscript = shouldProcessAiTranscript;
       voiceSessionFinalTranscript = '';
 
       if (recognition) {
@@ -2697,7 +2793,7 @@
       const aiBtn = document.getElementById('ai-dictate-btn');
       if (aiBtn) {
         aiBtn.classList.remove('listening');
-        aiBtn.textContent = '✨AI Voice Assist';
+        aiBtn.textContent = 'Voice';
       }
 
       currentVoiceField = null;
@@ -4463,7 +4559,7 @@ Response format MUST be a JSON object with this exact structure:
 
       if (currentVoiceButton) {
         currentVoiceButton.classList.add('listening');
-        currentVoiceButton.textContent = '🔴 Listening to visit...';
+        currentVoiceButton.textContent = 'Listening...';
       }
 
       // Show overlay with AI title
@@ -4491,6 +4587,7 @@ Response format MUST be a JSON object with this exact structure:
     }
 
     async function processAiDictation(transcript) {
+      isAiProcessingVoiceTranscript = true;
       const overlay = document.getElementById('voice-overlay');
       const overlayTitle = document.getElementById('voice-overlay-title');
       const overlayInterim = document.getElementById('voice-overlay-interim');
@@ -4502,10 +4599,10 @@ Response format MUST be a JSON object with this exact structure:
         overlay.classList.add('show');
       }
       if (overlayTitle) {
-        overlayTitle.textContent = '✨ AI is processing transcript...';
+        overlayTitle.textContent = 'AI is processing the voice transcript. Please wait';
       }
       if (overlayInterim) {
-        overlayInterim.textContent = 'Please wait while Gemini structures your record...';
+        overlayInterim.textContent = 'Please wait while AI structures your patient record...';
       }
 
       let apiKey = '';
@@ -4517,6 +4614,7 @@ Response format MUST be a JSON object with this exact structure:
 
       if (!apiKey) {
         alert('Gemini API key is not configured.');
+        isAiProcessingVoiceTranscript = false;
         if (overlay) {
           overlay.classList.remove('show');
           setTimeout(() => { overlay.style.display = 'none'; }, 300);
@@ -4635,6 +4733,7 @@ Response format MUST be a JSON object with this exact structure:
         console.error('AI dictation processing error:', error);
         showWarningMessage('⚠️ AI Service unavailable, please fill details manually');
       } finally {
+        isAiProcessingVoiceTranscript = false;
         if (overlay) {
           overlay.classList.remove('show');
           setTimeout(() => { overlay.style.display = 'none'; }, 300);
