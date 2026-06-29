@@ -2029,7 +2029,7 @@
                     <button type="button" class="btn btn-primary ai-action-btn file" id="ai-upload-btn" onclick="triggerAiFileUpload()">Upload File</button>
                 </div>
             </div>
-            <input type="file" id="ai-file-input" style="display: none;" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" onchange="handleAiFileUpload(event)">
+            <input type="file" id="ai-file-input" style="display: none;" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,audio/*,.mp3,.wav,.m4a,.ogg,.webm,.3gp" onchange="handleAiFileUpload(event)">
 
             <div class="form-group">
                 <label>Patient Name <span style="color: var(--secondary);">*</span></label>
@@ -2170,8 +2170,19 @@
                 Get a free API key from Google AI Studio. The key is stored locally on this device and is only used to connect directly to the AI Engine API.
             </p>
         </div>
+        <div class="form-group" style="margin-top: 1rem;">
+            <label>Voice Intake Language</label>
+            <select id="gemini-voice-lang" style="width: 100%; padding: 0.6rem; border-radius: 6px; background: var(--bg-card); color: var(--text); border: 1px solid rgba(164, 76, 255, 0.3); font-size: 0.85rem; outline: none; margin-top: 0.4rem;">
+                <option value="en-US">English (United States)</option>
+                <option value="en-IN">English (India) - Mixed/Hinglish accent</option>
+                <option value="hi-IN">Hindi / हिन्दी (India)</option>
+            </select>
+            <p style="font-size: 0.65rem; color: var(--text-dim); margin-top: 0.4rem; line-height: 1.3;">
+                Select the language you will speak during voice dictation. Gemini will automatically translate and parse details to English.
+            </p>
+        </div>
         <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-            <button type="button" class="btn btn-primary" onclick="saveAiSettings()" style="flex: 1; background: linear-gradient(135deg, #a44cff, #4facfe) !important;">Save Key</button>
+            <button type="button" class="btn btn-primary" onclick="saveAiSettings()" style="flex: 1; background: linear-gradient(135deg, #a44cff, #4facfe) !important;">Save details</button>
             <button type="button" class="btn btn-secondary" onclick="closeAiSettingsModal()" style="flex: 1;">Cancel</button>
         </div>
     </div>
@@ -2790,6 +2801,13 @@
       }
 
       try {
+        let savedLang = 'en-US';
+        if (typeof AndroidStorage !== 'undefined') {
+          savedLang = AndroidStorage.getItem('medvault_voice_lang') || 'en-US';
+        } else {
+          savedLang = localStorage.getItem('medvault_voice_lang') || 'en-US';
+        }
+        recognition.lang = savedLang;
         recognition.start();
       } catch (e) {
         console.error('Recognition start error:', e);
@@ -4333,11 +4351,6 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      // Limit file size to 2MB to keep local storage lightweight
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Profile picture size exceeds 2MB limit. Please select a smaller image.');
-        return;
-      }
 
       const reader = new FileReader();
       reader.onload = function() {
@@ -4411,15 +4424,20 @@
     function openAiSettingsModal() {
       const modal = document.getElementById('ai-settings-modal');
       const keyInput = document.getElementById('gemini-api-key');
+      const langSelect = document.getElementById('gemini-voice-lang');
       
       let savedKey = '';
+      let savedLang = 'en-US';
       if (typeof AndroidStorage !== 'undefined') {
         savedKey = AndroidStorage.getItem('medvault_gemini_api_key') || '';
+        savedLang = AndroidStorage.getItem('medvault_voice_lang') || 'en-US';
       } else {
         savedKey = localStorage.getItem('medvault_gemini_api_key') || '';
+        savedLang = localStorage.getItem('medvault_voice_lang') || 'en-US';
       }
       
       if (keyInput) keyInput.value = savedKey;
+      if (langSelect) langSelect.value = savedLang;
       if (modal) {
         modal.classList.add('show');
       }
@@ -4434,12 +4452,16 @@
 
     function saveAiSettings() {
       const keyInput = document.getElementById('gemini-api-key');
+      const langSelect = document.getElementById('gemini-voice-lang');
       const key = keyInput ? keyInput.value.trim() : '';
+      const lang = langSelect ? langSelect.value : 'en-US';
       
       if (typeof AndroidStorage !== 'undefined') {
         AndroidStorage.setItem('medvault_gemini_api_key', key);
+        AndroidStorage.setItem('medvault_voice_lang', lang);
       } else {
         localStorage.setItem('medvault_gemini_api_key', key);
+        localStorage.setItem('medvault_voice_lang', lang);
       }
       
       showSuccessMessage('✓ AI Configuration saved successfully!');
@@ -4467,30 +4489,22 @@
       }
     }
 
-    function handleAiFileUpload(event) {
+    async function handleAiFileUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      // Limit file size to 5MB
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size exceeds the 5MB limit. Please select a smaller file.');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = function() {
-        const dataUrl = reader.result;
+      try {
+        const preparedFile = await compressImageFile(file);
+        const dataUrl = await readFileAsDataUrl(preparedFile);
         const commaIdx = dataUrl.indexOf(',');
         const mimeType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
         const base64Data = dataUrl.substring(commaIdx + 1);
         
         processAiDocument(mimeType, base64Data);
-      };
-      reader.onerror = function(err) {
-        console.error('File read error:', err);
+      } catch (err) {
+        console.error('File read/compression error:', err);
         alert('Failed to read the file.');
-      };
-      reader.readAsDataURL(file);
+      }
     }
 
     async function processAiDocument(mimeType, base64Data) {
@@ -4506,7 +4520,7 @@
         overlay.classList.add('show');
       }
       if (overlayTitle) {
-        overlayTitle.textContent = '✨ AI is analyzing document...';
+        overlayTitle.textContent = '✨ AI is analyzing file...';
       }
       if (overlayInterim) {
         overlayInterim.textContent = 'Please wait while our AI Engine processes the uploaded file details...';
@@ -4529,7 +4543,7 @@
       }
 
       try {
-        const promptText = `Parse the uploaded clinical document/image and organize its details into a structured JSON object. Extract the patient's name, their 10-digit phone number, diagnosis details, prescribed medicine text, and structured prescriptions. If a value is not mentioned in the document, use an empty string. Ensure the phone number is strictly a string of 10 digits without any spaces or symbols.
+        const promptText = `Parse the uploaded clinical document, image, or audio recording and organize its details into a structured JSON object. Translate any Hindi/non-English descriptions, symptoms, or instructions to English (e.g. proper clinical English for diagnosis and instructions), but keep patient name and medicine names as dictated or spoken. Extract the patient's name, their 10-digit phone number, diagnosis details, prescribed medicine text, and structured prescriptions. If a value is not mentioned in the source, use an empty string. Ensure the phone number is strictly a string of 10 digits without any spaces or symbols.
 
 Response format MUST be a JSON object with this exact structure:
 {
@@ -4550,37 +4564,70 @@ Response format MUST be a JSON object with this exact structure:
   ]
 }`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  text: promptText
-                },
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
-                  }
-                }
-              ]
-            }],
-            generationConfig: {
-              responseMimeType: 'application/json'
-            }
-          })
-        });
+        const maxRetries = 2;
+        let attempt = 0;
+        let response = null;
+        let lastError = null;
 
-        if (!response.ok) {
-          let errDetail = '';
+        while (attempt <= maxRetries) {
           try {
-            errDetail = ' - ' + await response.text();
-          } catch (e) {}
-          throw new Error('AI Engine API call failed with status: ' + response.status + errDetail);
+            if (attempt > 0 && overlayInterim) {
+              overlayInterim.textContent = `Retrying request (Attempt ${attempt}/${maxRetries})...`;
+            }
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout per attempt
+
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              signal: controller.signal,
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    {
+                      text: promptText
+                    },
+                    {
+                      inlineData: {
+                        mimeType: mimeType,
+                        data: base64Data
+                      }
+                    }
+                  ]
+                }],
+                generationConfig: {
+                  responseMimeType: 'application/json'
+                }
+              })
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+              break;
+            } else {
+              let errDetail = '';
+              try {
+                errDetail = ' - ' + await response.text();
+              } catch (e) {}
+              throw new Error('API Error ' + response.status + errDetail);
+            }
+          } catch (err) {
+            console.warn(`Attempt ${attempt + 1} failed:`, err);
+            lastError = err;
+            attempt++;
+            if (attempt <= maxRetries) {
+              // Wait with exponential backoff (1.5s, 3.0s)
+              await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
+            }
+          }
+        }
+
+        if (!response || !response.ok) {
+          throw lastError || new Error('Failed to connect to AI Service after multiple attempts.');
         }
 
         const resData = await response.json();
@@ -4649,7 +4696,20 @@ Response format MUST be a JSON object with this exact structure:
         showSuccessMessage('✨ AI parsed document details successfully!');
       } catch (error) {
         console.error('AI document processing error:', error);
-        showWarningMessage('⚠️ AI Service unavailable, please fill details manually');
+        let errorMsg = '⚠️ AI Service unavailable, please fill details manually';
+        if (error.name === 'AbortError') {
+          errorMsg = '⚠️ AI request timed out. Please check your internet connection.';
+        } else if (error.message && error.message.includes('API Error 429')) {
+          errorMsg = '⚠️ AI Rate limit exceeded. Please wait a moment and try again.';
+        } else if (error.message && error.message.includes('API Error 400')) {
+          errorMsg = '⚠️ AI Request failed. Please check your API key and file format.';
+        } else if (error.message && error.message.includes('API Error 403')) {
+          errorMsg = '⚠️ Access forbidden. Please verify your Gemini API key is valid.';
+        } else if (error.message) {
+          const cleanMsg = error.message.split('\n')[0];
+          errorMsg = `⚠️ Error: ${cleanMsg.substring(0, 100)}`;
+        }
+        showWarningMessage(errorMsg);
       } finally {
         if (overlay) {
           overlay.classList.remove('show');
@@ -4708,6 +4768,13 @@ Response format MUST be a JSON object with this exact structure:
       }
 
       try {
+        let savedLang = 'en-US';
+        if (typeof AndroidStorage !== 'undefined') {
+          savedLang = AndroidStorage.getItem('medvault_voice_lang') || 'en-US';
+        } else {
+          savedLang = localStorage.getItem('medvault_voice_lang') || 'en-US';
+        }
+        recognition.lang = savedLang;
         recognition.start();
       } catch (e) {
         console.error('Recognition start error:', e);
@@ -4753,7 +4820,7 @@ Response format MUST be a JSON object with this exact structure:
       }
 
       try {
-        const promptText = `Parse the following unstructured clinical visit dictation transcript and organize it into a structured JSON object. Extract the patient's name, their 10-digit phone number, diagnosis details, prescribed medicine text, and structured prescriptions. If a value is not mentioned in the transcript, use an empty string. Ensure the phone number is strictly a string of 10 digits without any spaces or symbols.
+        const promptText = `Parse the following unstructured clinical visit dictation transcript and organize it into a structured JSON object. Translate any Hindi/non-English descriptions, symptoms, or instructions to English (e.g. proper clinical English for diagnosis and instructions), but keep patient name and medicine names as dictated or spoken. Extract the patient's name, their 10-digit phone number, diagnosis details, prescribed medicine text, and structured prescriptions. If a value is not mentioned in the transcript, use an empty string. Ensure the phone number is strictly a string of 10 digits without any spaces or symbols.
 
 Dictation: "${transcript}"
 
