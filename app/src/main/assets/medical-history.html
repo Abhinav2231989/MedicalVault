@@ -2167,7 +2167,7 @@
 
         <div class="form-group">
             <label>Potency</label>
-            <input type="text" id="prescription-potency" placeholder="e.g., Any, 30, 200, 1M...">
+            <input type="text" id="prescription-potency" placeholder="e.g., Any, 30, 200, 1M..." oninput="handlePotencyTextInput(this)">
             <div class="choice-grid" data-prescription-group="potency" style="margin-top: 0.5rem;">
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', 'ANY', this)">ANY</button>
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '30', this)">30</button>
@@ -2185,8 +2185,43 @@
                     <input type="number" id="prescription-scale-number" min="1" max="100" placeholder="1-100" onfocus="activateScaleX()">
                     <button type="button" class="choice-btn-sub" id="scale-x-btn" onclick="selectScaleX(this)">X</button>
                 </div>
+                <div id="scale-lm-container" style="display: none; align-items: center; border: 1px solid rgba(164, 76, 255, 0.3); border-radius: 6px; padding: 2px 4px; background: rgba(19, 47, 76, 0.45); height: 38px; box-sizing: border-box;">
+                    <select id="prescription-scale-lm-select" style="background: transparent; border: none; color: var(--text); font-size: 0.85rem; outline: none; padding: 4px; width: 80px;" onchange="selectScaleLMNumber(this)">
+                        <option value="">LM No.</option>
+                        <option value="0/1">0/1</option>
+                        <option value="0/2">0/2</option>
+                        <option value="0/3">0/3</option>
+                        <option value="0/4">0/4</option>
+                        <option value="0/5">0/5</option>
+                        <option value="0/6">0/6</option>
+                        <option value="0/7">0/7</option>
+                        <option value="0/8">0/8</option>
+                        <option value="0/9">0/9</option>
+                        <option value="0/10">0/10</option>
+                        <option value="0/11">0/11</option>
+                        <option value="0/12">0/12</option>
+                        <option value="0/13">0/13</option>
+                        <option value="0/14">0/14</option>
+                        <option value="0/15">0/15</option>
+                        <option value="0/16">0/16</option>
+                        <option value="0/17">0/17</option>
+                        <option value="0/18">0/18</option>
+                        <option value="0/19">0/19</option>
+                        <option value="0/20">0/20</option>
+                        <option value="0/21">0/21</option>
+                        <option value="0/22">0/22</option>
+                        <option value="0/23">0/23</option>
+                        <option value="0/24">0/24</option>
+                        <option value="0/25">0/25</option>
+                        <option value="0/26">0/26</option>
+                        <option value="0/27">0/27</option>
+                        <option value="0/28">0/28</option>
+                        <option value="0/29">0/29</option>
+                        <option value="0/30">0/30</option>
+                    </select>
+                </div>
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'LM', this)">LM</button>
-                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'Q', this)">Q</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'Ø', this)">Ø</button>
             </div>
         </div>
 
@@ -4048,8 +4083,8 @@
       const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(function(item) {
         item = normalizePrescriptionItem(item);
         const potencyVal = item.potency && item.potency !== 'ANY' ? item.potency : '';
-        const scalePart = (item.scaleNumber || '') + (item.scale || '');
-        const potencyStr = potencyVal || scalePart ? (potencyVal + scalePart) : '';
+        const scalePart = getScaleDisplay(item);
+        const potencyStr = potencyVal || scalePart ? (potencyVal + (scalePart ? ' ' + scalePart : '')) : '';
         const meta = [
           potencyStr ? 'Potency: ' + potencyStr : '',
           normalizePrescriptionVehicle(item.vehicle),
@@ -4079,8 +4114,8 @@
       const prescriptionsHtml = prescriptions.length
         ? prescriptions.map(function(item, index) {
             const potencyVal = item.potency && item.potency !== 'ANY' ? item.potency : '';
-            const scalePart = (item.scaleNumber || '') + (item.scale || '');
-            const potencyStr = potencyVal || scalePart ? (potencyVal + scalePart) : '';
+            const scalePart = getScaleDisplay(item);
+            const potencyStr = potencyVal || scalePart ? (potencyVal + (scalePart ? ' ' + scalePart : '')) : '';
             const meta = [
               potencyStr ? 'Potency: ' + potencyStr : '',
               normalizePrescriptionVehicle(item.vehicle),
@@ -4156,11 +4191,24 @@
       });
     }
 
+    function getScaleDisplay(item) {
+      const scale = String(item.scale || '').trim();
+      const scaleNumber = String(item.scaleNumber || '').trim();
+      if (!scale) return '';
+      if (scale === 'LM') {
+        return scaleNumber ? 'LM ' + scaleNumber : 'LM';
+      }
+      if (scale === 'Ø') {
+        return 'Ø';
+      }
+      return scaleNumber + scale.toUpperCase();
+    }
+
     function prescriptionSummary(item) {
       item = normalizePrescriptionItem(item);
       const medicine = item.medicine || 'Medicine';
-      const scalePart = (item.scaleNumber || '') + (item.scale || '');
-      const potency = item.potency && item.potency !== 'ANY' ? ' (' + item.potency + scalePart + ')' : (scalePart ? ' (' + scalePart + ')' : '');
+      const scalePart = getScaleDisplay(item);
+      const potency = item.potency && item.potency !== 'ANY' ? ' (' + item.potency + (scalePart ? ' ' + scalePart : '') + ')' : (scalePart ? ' (' + scalePart + ')' : '');
       const duration = item.duration ? ' - ' + item.duration : '';
       return medicine + potency + duration;
     }
@@ -4198,6 +4246,7 @@
       currentPrescriptionDraft = {
         potency: '',
         scale: 'x',
+        scaleNumber: '',
         vehicle: 'Pills'
       };
       editingPrescriptionIndex = -1;
@@ -4206,6 +4255,12 @@
       document.getElementById('prescription-scale-number').value = '';
       document.getElementById('prescription-duration').value = '';
       document.getElementById('prescription-instructions').value = '';
+      
+      const lmSelect = document.getElementById('prescription-scale-lm-select');
+      if (lmSelect) lmSelect.value = '';
+      const combinedLM = document.getElementById('scale-lm-container');
+      if (combinedLM) combinedLM.style.display = 'none';
+
       document.querySelectorAll('[data-prescription-group] .choice-btn').forEach(function(btn) {
         btn.classList.remove('active');
       });
@@ -4227,10 +4282,27 @@
           btn.classList.remove('active');
         });
         const combinedX = wrapper.querySelector('.scale-x-combined');
+        const combinedLM = document.getElementById('scale-lm-container');
         if (combinedX) combinedX.classList.remove('active');
+        if (combinedLM) combinedLM.style.display = 'none';
         
         if (value === 'x' || value === 'X') {
           if (combinedX) combinedX.classList.add('active');
+        } else if (value === 'LM') {
+          if (combinedLM) combinedLM.style.display = 'inline-flex';
+          const lmSelect = document.getElementById('prescription-scale-lm-select');
+          if (lmSelect && currentPrescriptionDraft.scaleNumber) {
+            lmSelect.value = currentPrescriptionDraft.scaleNumber;
+          }
+          wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+            const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'LM'") !== -1;
+            btn.classList.toggle('active', isActive);
+          });
+        } else if (value === 'Ø') {
+          wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+            const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'Ø'") !== -1;
+            btn.classList.toggle('active', isActive);
+          });
         } else {
           wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
             const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'" + value + "'") !== -1;
@@ -4245,6 +4317,59 @@
       }
     }
 
+    function clearScaleSelection() {
+      currentPrescriptionDraft.scale = '';
+      currentPrescriptionDraft.scaleNumber = '';
+      
+      const scaleWrapper = document.querySelector('[data-prescription-group="scale"]');
+      if (scaleWrapper) {
+        scaleWrapper.querySelectorAll('.choice-btn, .choice-btn-sub').forEach(function(btn) {
+          btn.classList.remove('active');
+        });
+        const combinedX = scaleWrapper.querySelector('.scale-x-combined');
+        if (combinedX) combinedX.classList.remove('active');
+      }
+      
+      const scaleNumInput = document.getElementById('prescription-scale-number');
+      if (scaleNumInput) scaleNumInput.value = '';
+      
+      const lmSelect = document.getElementById('prescription-scale-lm-select');
+      if (lmSelect) lmSelect.value = '';
+      
+      const combinedLM = document.getElementById('scale-lm-container');
+      if (combinedLM) combinedLM.style.display = 'none';
+      
+      const combinedXContainer = document.getElementById('scale-x-container');
+      if (combinedXContainer) combinedXContainer.style.display = 'flex';
+    }
+
+    function clearPotencySelection() {
+      currentPrescriptionDraft.potency = '';
+      
+      const potencyWrapper = document.querySelector('[data-prescription-group="potency"]');
+      if (potencyWrapper) {
+        potencyWrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+          btn.classList.remove('active');
+        });
+      }
+      
+      const potencyInput = document.getElementById('prescription-potency');
+      if (potencyInput) potencyInput.value = '';
+    }
+
+    function handlePotencyTextInput(input) {
+      if (input.value.trim() !== '') {
+        clearScaleSelection();
+        currentPrescriptionDraft.potency = input.value.trim();
+        const potencyWrapper = document.querySelector('[data-prescription-group="potency"]');
+        if (potencyWrapper) {
+          potencyWrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+            btn.classList.remove('active');
+          });
+        }
+      }
+    }
+
     function openPrescriptionModal(index) {
       resetPrescriptionModal();
       if (typeof index === 'number' && index >= 0 && index < currentPrescriptions.length) {
@@ -4254,6 +4379,7 @@
         currentPrescriptionDraft = {
           potency: item.potency || '',
           scale: item.scale || '',
+          scaleNumber: item.scaleNumber || '',
           vehicle: normalizePrescriptionVehicle(item.vehicle) || 'Pills'
         };
         document.getElementById('prescription-medicine').value = getPrescriptionMedicine(item);
@@ -4263,7 +4389,7 @@
         document.getElementById('prescription-instructions').value = item.instructions || '';
         setPrescriptionChoice('potency', item.potency || '');
         if (item.scale) setPrescriptionChoice('scale', item.scale);
-      setPrescriptionChoice('vehicle', normalizePrescriptionVehicle(item.vehicle) || 'Pills');
+        setPrescriptionChoice('vehicle', normalizePrescriptionVehicle(item.vehicle) || 'Pills');
       }
       document.getElementById('prescription-modal').classList.add('show');
     }
@@ -4272,10 +4398,21 @@
       document.getElementById('prescription-modal').classList.remove('show');
     }
 
+    function selectScaleLMNumber(select) {
+      clearPotencySelection();
+      currentPrescriptionDraft.scaleNumber = select.value;
+    }
+
     function selectPrescriptionOption(group, value, button) {
-      currentPrescriptionDraft[group] = value;
       if (group === 'potency') {
+        clearScaleSelection();
+        currentPrescriptionDraft[group] = value;
         document.getElementById('prescription-potency').value = value;
+      } else if (group === 'scale') {
+        clearPotencySelection();
+        currentPrescriptionDraft[group] = value;
+      } else {
+        currentPrescriptionDraft[group] = value;
       }
       const wrapper = button.closest('[data-prescription-group]');
       wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
@@ -4284,8 +4421,22 @@
       
       if (group === 'scale') {
         const combinedX = wrapper.querySelector('.scale-x-combined');
-        if (combinedX) {
-          combinedX.classList.remove('active');
+        const combinedLM = document.getElementById('scale-lm-container');
+        if (combinedX) combinedX.classList.remove('active');
+        if (combinedLM) combinedLM.style.display = 'none';
+
+        if (value === 'LM') {
+          if (combinedLM) {
+            combinedLM.style.display = 'inline-flex';
+          }
+          const lmSelect = document.getElementById('prescription-scale-lm-select');
+          currentPrescriptionDraft.scaleNumber = lmSelect ? lmSelect.value : '';
+        } else if (value === 'Ø') {
+          currentPrescriptionDraft.scaleNumber = '';
+          const scaleNumInput = document.getElementById('prescription-scale-number');
+          if (scaleNumInput) scaleNumInput.value = '';
+        } else {
+          if (combinedX) combinedX.classList.add('active');
         }
       }
 
@@ -4293,11 +4444,14 @@
     }
 
     function selectScaleX(button) {
+      clearPotencySelection();
       currentPrescriptionDraft.scale = 'x';
       const wrapper = button.closest('[data-prescription-group]');
       wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
         btn.classList.remove('active');
       });
+      const combinedLM = document.getElementById('scale-lm-container');
+      if (combinedLM) combinedLM.style.display = 'none';
       const combinedX = wrapper.querySelector('.scale-x-combined');
       if (combinedX) {
         combinedX.classList.add('active');
@@ -4305,6 +4459,7 @@
     }
 
     function activateScaleX() {
+      clearPotencySelection();
       const input = document.getElementById('prescription-scale-number');
       const wrapper = input.closest('[data-prescription-group]');
       if (!wrapper) return;
@@ -4312,6 +4467,8 @@
       wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
         btn.classList.remove('active');
       });
+      const combinedLM = document.getElementById('scale-lm-container');
+      if (combinedLM) combinedLM.style.display = 'none';
       const combinedX = wrapper.querySelector('.scale-x-combined');
       if (combinedX) {
         combinedX.classList.add('active');
@@ -4322,25 +4479,39 @@
       const existingItem = editingPrescriptionIndex >= 0 ? normalizePrescriptionItem(currentPrescriptions[editingPrescriptionIndex]) : null;
       const medicine = document.getElementById('prescription-medicine').value.trim() || getPrescriptionMedicine(existingItem);
       const potency = document.getElementById('prescription-potency').value.trim() || currentPrescriptionDraft.potency || '';
-      const scaleNumberRaw = document.getElementById('prescription-scale-number').value.trim();
-      const scaleNumber = scaleNumberRaw ? Math.max(1, Math.min(100, parseInt(scaleNumberRaw, 10) || 1)) : '';
+      const scale = currentPrescriptionDraft.scale || '';
+      let scaleNumber = '';
+      
+      if (scale === 'LM') {
+        const lmSelect = document.getElementById('prescription-scale-lm-select');
+        scaleNumber = lmSelect ? lmSelect.value : '';
+      } else if (scale === 'x' || scale === 'X') {
+        const scaleNumberRaw = document.getElementById('prescription-scale-number').value.trim();
+        scaleNumber = scaleNumberRaw ? String(Math.max(1, Math.min(100, parseInt(scaleNumberRaw, 10) || 1))) : '';
+      } else if (scale === 'Ø') {
+        scaleNumber = '';
+      }
+
       const duration = document.getElementById('prescription-duration').value.trim();
       const instructions = document.getElementById('prescription-instructions').value.trim();
+      
       if (!medicine) {
         showWarningMessage('Please enter medicine name for prescription');
         alert('Please enter medicine name for prescription');
         return;
       }
+      
       const item = {
         medicine: medicine,
         potency: potency,
         scaleNumber: scaleNumber,
-        scale: scaleNumber ? (currentPrescriptionDraft.scale || 'x') : '',
+        scale: scale,
         vehicle: normalizePrescriptionVehicle(currentPrescriptionDraft.vehicle) || 'Pills',
         duration: duration,
         instructions: instructions,
         createdAt: new Date().toISOString()
       };
+      
       if (editingPrescriptionIndex >= 0) {
         item.createdAt = existingItem.createdAt || item.createdAt;
         item.updatedAt = new Date().toISOString();
@@ -4879,9 +5050,14 @@ Response format MUST be a JSON object with this exact structure:
           // Normalize prescription objects
           currentPrescriptions = structuredData.prescriptions.map(item => {
             const medicineName = item.medicine || item.medicineName || item.name || '';
-            let parsedScale = String(item.scale || '').trim().toLowerCase();
-            if (parsedScale === 'x' || parsedScale === 'lm' || parsedScale === 'q') {
-              // Valid scale
+            let parsedScale = String(item.scale || '').trim();
+            const lowerScale = parsedScale.toLowerCase();
+            if (lowerScale === 'x') {
+              parsedScale = 'x';
+            } else if (lowerScale === 'lm') {
+              parsedScale = 'LM';
+            } else if (lowerScale === 'q' || parsedScale === 'Ø' || parsedScale === 'ø') {
+              parsedScale = 'Ø';
             } else {
               parsedScale = '';
             }
@@ -5167,9 +5343,14 @@ Response format MUST be a JSON object with this exact structure:
           // Normalize prescription objects
           currentPrescriptions = structuredData.prescriptions.map(item => {
             const medicineName = item.medicine || item.medicineName || item.name || '';
-            let parsedScale = String(item.scale || '').trim().toLowerCase();
-            if (parsedScale === 'x' || parsedScale === 'lm' || parsedScale === 'q') {
-              // Valid scale
+            let parsedScale = String(item.scale || '').trim();
+            const lowerScale = parsedScale.toLowerCase();
+            if (lowerScale === 'x') {
+              parsedScale = 'x';
+            } else if (lowerScale === 'lm') {
+              parsedScale = 'LM';
+            } else if (lowerScale === 'q' || parsedScale === 'Ø' || parsedScale === 'ø') {
+              parsedScale = 'Ø';
             } else {
               parsedScale = '';
             }
