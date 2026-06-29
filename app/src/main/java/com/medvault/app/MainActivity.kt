@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private var cameraImageUri: Uri? = null
     private val FILE_CHOOSER_REQUEST_CODE = 1
     private val PERMISSION_REQUEST_CODE = 100
+    private val CONFIRM_DEVICE_CREDENTIAL_REQUEST_CODE = 2
     
     companion object {
         private const val RC_SIGN_IN = 9001
@@ -346,6 +347,13 @@ class MainActivity : AppCompatActivity() {
                 val task: Task<GoogleSignInAccount> = GoogleSignIn.getSignedInAccountFromIntent(data)
                 handleSignInResult(task)
             }
+            CONFIRM_DEVICE_CREDENTIAL_REQUEST_CODE -> {
+                if (resultCode == Activity.RESULT_OK) {
+                    notifyBiometricStatus(true, "Authentication succeeded")
+                } else {
+                    notifyBiometricStatus(false, "Authentication failed")
+                }
+            }
             FILE_CHOOSER_REQUEST_CODE -> {
                 if (filePathCallback == null) return
 
@@ -561,9 +569,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun isDeviceSecure(): Boolean {
+            val keyguardManager = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+            return keyguardManager.isDeviceSecure
+        }
+
+        @JavascriptInterface
         fun authenticate() {
             runOnUiThread {
                 showBiometricPrompt()
+            }
+        }
+
+        @JavascriptInterface
+        fun authenticateWithPattern() {
+            runOnUiThread {
+                val keyguardManager = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+                val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+                    "MedVault Unlock",
+                    "Please draw your pattern or enter your PIN/password to log in"
+                )
+                if (intent != null) {
+                    startActivityForResult(intent, CONFIRM_DEVICE_CREDENTIAL_REQUEST_CODE)
+                } else {
+                    notifyBiometricStatus(false, "Confirm Device Credential not available")
+                }
             }
         }
     }

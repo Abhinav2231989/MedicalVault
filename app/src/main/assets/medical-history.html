@@ -1742,6 +1742,37 @@
         }
       }
 
+      #glowing-pattern-btn:hover {
+        color: #fff !important;
+        border-color: #fff !important;
+      }
+      #glowing-pattern-btn:active {
+        transform: scale(0.95);
+      }
+      .pattern-glow {
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        border: 2px solid #a44cff;
+        border-radius: 50%;
+        animation: pattern-ripple 2s infinite ease-out;
+        pointer-events: none;
+      }
+      @keyframes pattern-ripple {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+          box-shadow: 0 0 0 0 rgba(164, 76, 255, 0.7);
+        }
+        100% {
+          transform: scale(1.4);
+          opacity: 0;
+          box-shadow: 0 0 0 15px rgba(164, 76, 255, 0);
+        }
+      }
+
       /* Settings Dropdown CSS styling */
       .settings-dropdown {
         position: relative;
@@ -1806,22 +1837,45 @@
             <h2 id="biometric-welcome-name" style="font-family: 'Syne', sans-serif; font-size: 1.35rem; color: #fff; margin-bottom: 0.25rem; font-weight: 700;">Welcome</h2>
             <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 2.25rem; letter-spacing: 0.5px;">SECURE MEDICAL PORTAL</p>
             
-            <!-- Glowing Fingerprint Button Container -->
-            <div style="margin-bottom: 2.5rem; position: relative; display: inline-block;">
-                <button type="button" onclick="startBiometricLogin()" id="glowing-fingerprint-btn" style="position: relative; background: radial-gradient(circle, rgba(0, 168, 168, 0.2) 0%, rgba(19, 47, 76, 0.6) 100%); border: 2px solid var(--primary); border-radius: 50%; width: 90px; height: 90px; font-size: 2.5rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 0 20px rgba(0, 168, 168, 0.3);">
-                    <svg class="biometric-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                        <path d="M18.6 18.1C22.1 14.9 26.8 13 32 13s9.9 1.9 13.4 5.1" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                        <path d="M13.9 27.9C16.1 19.8 23.4 14 32 14s15.9 5.8 18.1 13.9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
-                        <path d="M21.3 27.6C23.1 23.3 27.3 20.4 32 20.4s8.9 2.9 10.7 7.2" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
-                        <path d="M18.2 37.4v-4.3C18.2 25.5 24.4 19.3 32 19.3s13.8 6.2 13.8 13.8v2.1c0 3.6-2.9 6.5-6.5 6.5s-6.5-2.9-6.5-6.5v-4.3" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
-                        <path d="M25.5 33.1c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5v2.1" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
-                        <path d="M25.5 40.2c1.7 6.6 7.7 10.9 14.1 9.9" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
-                        <path d="M32 34.9c0 7.5 5.1 13.7 12 15.4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
-                        <path d="M18.7 45.8c2.7 5.1 7.6 8.7 13.3 9.7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
-                    </svg>
-                    <span class="fingerprint-glow"></span>
-                </button>
-                <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">Tap to Scan</div>
+            <!-- Buttons Container -->
+            <div id="unlock-options-container" style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 2.5rem; align-items: center;">
+                <!-- Glowing Fingerprint Button Container -->
+                <div id="fingerprint-option-wrapper" style="position: relative; text-align: center; display: none;">
+                    <button type="button" onclick="startBiometricLogin()" id="glowing-fingerprint-btn" style="position: relative; background: radial-gradient(circle, rgba(0, 168, 168, 0.2) 0%, rgba(19, 47, 76, 0.6) 100%); border: 2px solid var(--primary); border-radius: 50%; width: 90px; height: 90px; font-size: 2.5rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 0 20px rgba(0, 168, 168, 0.3);">
+                        <svg class="biometric-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                            <path d="M18.6 18.1C22.1 14.9 26.8 13 32 13s9.9 1.9 13.4 5.1" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            <path d="M13.9 27.9C16.1 19.8 23.4 14 32 14s15.9 5.8 18.1 13.9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+                            <path d="M21.3 27.6C23.1(23.3 27.3 20.4 32 20.4s8.9 2.9 10.7 7.2" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                            <path d="M18.2 37.4v-4.3C18.2 25.5 24.4 19.3 32 19.3s13.8 6.2 13.8 13.8v2.1c0 3.6-2.9 6.5-6.5 6.5s-6.5-2.9-6.5-6.5v-4.3" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                            <path d="M25.5 33.1c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5v2.1" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                            <path d="M25.5 40.2c1.7 6.6 7.7 10.9 14.1 9.9" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                            <path d="M32 34.9c0 7.5 5.1 13.7 12 15.4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+                            <path d="M18.7 45.8c2.7 5.1 7.6 8.7 13.3 9.7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+                        </svg>
+                        <span class="fingerprint-glow"></span>
+                    </button>
+                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">Tap to Scan</div>
+                </div>
+
+                <!-- Glowing Pattern Button Container -->
+                <div id="pattern-option-wrapper" style="position: relative; text-align: center; display: none;">
+                    <button type="button" onclick="startPatternLogin()" id="glowing-pattern-btn" style="position: relative; background: radial-gradient(circle, rgba(164, 76, 255, 0.15) 0%, rgba(19, 47, 76, 0.6) 100%); border: 2px solid #a44cff; border-radius: 50%; width: 90px; height: 90px; font-size: 2.5rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: #a44cff; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 0 20px rgba(164, 76, 255, 0.25);">
+                        <svg viewBox="0 0 64 64" style="width: 32px; height: 32px;" aria-hidden="true" focusable="false">
+                            <circle cx="16" cy="16" r="4" fill="currentColor"/>
+                            <circle cx="32" cy="16" r="4" fill="currentColor"/>
+                            <circle cx="48" cy="16" r="4" fill="currentColor"/>
+                            <circle cx="16" cy="32" r="4" fill="currentColor"/>
+                            <circle cx="32" cy="32" r="4" fill="currentColor"/>
+                            <circle cx="48" cy="32" r="4" fill="currentColor"/>
+                            <circle cx="16" cy="48" r="4" fill="currentColor"/>
+                            <circle cx="32" cy="48" r="4" fill="currentColor"/>
+                            <circle cx="48" cy="48" r="4" fill="currentColor"/>
+                            <path d="M 16 16 L 32 32 L 48 32 L 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+                        </svg>
+                        <span class="pattern-glow"></span>
+                    </button>
+                    <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">Pattern Lock</div>
+                </div>
             </div>
             
             <div style="margin-top: 1rem; border-top: 1px dashed rgba(46, 82, 102, 0.4); padding-top: 1.5rem;">
@@ -3718,8 +3772,17 @@
       }
       
       const hasBiometric = typeof BiometricAuth !== 'undefined' && BiometricAuth.isBiometricAvailable();
+      const hasPattern = typeof BiometricAuth !== 'undefined' && typeof BiometricAuth.isDeviceSecure === 'function' && BiometricAuth.isDeviceSecure();
       
-      if (savedLastUser && hasBiometric) {
+      if (savedLastUser && (hasBiometric || hasPattern)) {
+        // Show fingerprint option wrapper if available
+        const fpWrapper = document.getElementById('fingerprint-option-wrapper');
+        if (fpWrapper) fpWrapper.style.display = hasBiometric ? 'inline-block' : 'none';
+
+        // Show pattern option wrapper if available
+        const patWrapper = document.getElementById('pattern-option-wrapper');
+        if (patWrapper) patWrapper.style.display = hasPattern ? 'inline-block' : 'none';
+
         // Pre-fill fields for traditional form switcher
         document.getElementById('login-name').value = savedLastUser;
         document.getElementById('login-email').value = savedLastEmail || '';
@@ -3742,6 +3805,12 @@
     function startBiometricLogin() {
       if (typeof BiometricAuth !== 'undefined') {
         BiometricAuth.authenticate();
+      }
+    }
+
+    function startPatternLogin() {
+      if (typeof BiometricAuth !== 'undefined' && typeof BiometricAuth.authenticateWithPattern === 'function') {
+        BiometricAuth.authenticateWithPattern();
       }
     }
 
