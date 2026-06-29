@@ -1529,7 +1529,57 @@
         }
 
         .scale-grid {
-          grid-template-columns: 1.1fr repeat(3, 1fr);
+          grid-template-columns: 1.8fr 1fr 1fr;
+        }
+
+        .scale-x-combined {
+          display: flex;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: var(--bg-light);
+          overflow: hidden;
+        }
+
+        .scale-x-combined input {
+          flex: 1;
+          border: none !important;
+          background: transparent !important;
+          padding: 0.5rem;
+          color: var(--text);
+          font-family: inherit;
+          text-align: center;
+          width: 50px;
+          min-width: 0;
+          box-shadow: none !important;
+        }
+
+        .scale-x-combined input:focus {
+          outline: none;
+          box-shadow: none !important;
+        }
+
+        .choice-btn-sub {
+          border: none;
+          border-left: 1px solid var(--border);
+          background: transparent;
+          color: var(--text);
+          padding: 0.5rem 0.75rem;
+          font-family: inherit;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.3s ease;
+          min-width: 40px;
+          text-align: center;
+        }
+
+        .scale-x-combined.active {
+          border-color: var(--primary);
+        }
+
+        .scale-x-combined.active .choice-btn-sub {
+          background: var(--primary);
+          color: white;
+          font-weight: bold;
         }
 
         .choice-btn {
@@ -2060,9 +2110,9 @@
 
         <div class="form-group">
             <label>Potency</label>
-            <input type="text" id="prescription-potency" placeholder="Any, 30, 200, 1M...">
+            <input type="text" id="prescription-potency" placeholder="e.g., Any, 30, 200, 1M...">
             <div class="choice-grid" data-prescription-group="potency" style="margin-top: 0.5rem;">
-                <button type="button" class="choice-btn active" onclick="selectPrescriptionOption('potency', 'ANY', this)">ANY</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', 'ANY', this)">ANY</button>
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '30', this)">30</button>
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '200', this)">200</button>
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('potency', '1M', this)">1M</button>
@@ -2074,10 +2124,12 @@
         <div class="form-group">
             <label>Scale</label>
             <div class="choice-grid scale-grid" data-prescription-group="scale">
-                <input type="number" id="prescription-scale-number" min="1" max="100" placeholder="1-100">
-                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'X', this)">X</button>
+                <div class="scale-x-combined" id="scale-x-container">
+                    <input type="number" id="prescription-scale-number" min="1" max="100" placeholder="1-100" onfocus="activateScaleX()">
+                    <button type="button" class="choice-btn-sub" id="scale-x-btn" onclick="selectScaleX(this)">X</button>
+                </div>
                 <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'LM', this)">LM</button>
-                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'Ø', this)">Ø</button>
+                <button type="button" class="choice-btn" onclick="selectPrescriptionOption('scale', 'Q', this)">Q</button>
             </div>
         </div>
 
@@ -3171,8 +3223,8 @@
     let currentPrescriptions = [];
     let editingPrescriptionIndex = -1;
     let currentPrescriptionDraft = {
-      potency: 'ANY',
-      scale: '',
+      potency: '',
+      scale: 'x',
       vehicle: 'Pills'
     };
     let inactivityTimer = null;
@@ -3892,8 +3944,11 @@
     function buildPrescriptionPdfPayload(record) {
       const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(function(item) {
         item = normalizePrescriptionItem(item);
+        const potencyVal = item.potency && item.potency !== 'ANY' ? item.potency : '';
+        const scalePart = (item.scaleNumber || '') + (item.scale || '');
+        const potencyStr = potencyVal || scalePart ? (potencyVal + scalePart) : '';
         const meta = [
-          item.potency ? 'Potency: ' + item.potency + (item.scaleNumber || '') + (item.scale || '') : '',
+          potencyStr ? 'Potency: ' + potencyStr : '',
           normalizePrescriptionVehicle(item.vehicle),
           item.duration ? 'Duration: ' + item.duration : ''
         ].filter(Boolean).join(' | ');
@@ -3920,8 +3975,11 @@
       const prescriptions = Array.isArray(record.prescriptions) ? record.prescriptions.map(normalizePrescriptionItem) : [];
       const prescriptionsHtml = prescriptions.length
         ? prescriptions.map(function(item, index) {
+            const potencyVal = item.potency && item.potency !== 'ANY' ? item.potency : '';
+            const scalePart = (item.scaleNumber || '') + (item.scale || '');
+            const potencyStr = potencyVal || scalePart ? (potencyVal + scalePart) : '';
             const meta = [
-              item.potency ? 'Potency: ' + item.potency + (item.scaleNumber || '') + (item.scale || '') : '',
+              potencyStr ? 'Potency: ' + potencyStr : '',
               normalizePrescriptionVehicle(item.vehicle),
               item.duration ? 'Duration: ' + item.duration : ''
             ].filter(Boolean).join(' | ');
@@ -4035,30 +4093,53 @@
 
     function resetPrescriptionModal() {
       currentPrescriptionDraft = {
-        potency: 'ANY',
-        scale: '',
+        potency: '',
+        scale: 'x',
         vehicle: 'Pills'
       };
       editingPrescriptionIndex = -1;
       document.getElementById('prescription-medicine').value = '';
-      document.getElementById('prescription-potency').value = 'ANY';
+      document.getElementById('prescription-potency').value = '';
       document.getElementById('prescription-scale-number').value = '';
       document.getElementById('prescription-duration').value = '';
       document.getElementById('prescription-instructions').value = '';
       document.querySelectorAll('[data-prescription-group] .choice-btn').forEach(function(btn) {
         btn.classList.remove('active');
       });
-      document.querySelector('[data-prescription-group="potency"] .choice-btn').classList.add('active');
+
       document.querySelector('[data-prescription-group="vehicle"] .choice-btn').classList.add('active');
+      
+      const combinedX = document.querySelector('[data-prescription-group="scale"] .scale-x-combined');
+      if (combinedX) {
+        combinedX.classList.add('active');
+      }
     }
 
     function setPrescriptionChoice(group, value) {
       const wrapper = document.querySelector('[data-prescription-group="' + group + '"]');
       if (!wrapper) return;
-      wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
-        const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'" + value + "'") !== -1;
-        btn.classList.toggle('active', isActive);
-      });
+      
+      if (group === 'scale') {
+        wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+          btn.classList.remove('active');
+        });
+        const combinedX = wrapper.querySelector('.scale-x-combined');
+        if (combinedX) combinedX.classList.remove('active');
+        
+        if (value === 'x' || value === 'X') {
+          if (combinedX) combinedX.classList.add('active');
+        } else {
+          wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+            const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'" + value + "'") !== -1;
+            btn.classList.toggle('active', isActive);
+          });
+        }
+      } else {
+        wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+          const isActive = btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'" + value + "'") !== -1;
+          btn.classList.toggle('active', isActive);
+        });
+      }
     }
 
     function openPrescriptionModal(index) {
@@ -4068,16 +4149,16 @@
         currentPrescriptions[index] = item;
         editingPrescriptionIndex = index;
         currentPrescriptionDraft = {
-          potency: item.potency || 'ANY',
+          potency: item.potency || '',
           scale: item.scale || '',
           vehicle: normalizePrescriptionVehicle(item.vehicle) || 'Pills'
         };
         document.getElementById('prescription-medicine').value = getPrescriptionMedicine(item);
-        document.getElementById('prescription-potency').value = item.potency || 'ANY';
+        document.getElementById('prescription-potency').value = item.potency || '';
         document.getElementById('prescription-scale-number').value = item.scaleNumber || '';
         document.getElementById('prescription-duration').value = item.duration || '';
         document.getElementById('prescription-instructions').value = item.instructions || '';
-        setPrescriptionChoice('potency', item.potency || 'ANY');
+        setPrescriptionChoice('potency', item.potency || '');
         if (item.scale) setPrescriptionChoice('scale', item.scale);
       setPrescriptionChoice('vehicle', normalizePrescriptionVehicle(item.vehicle) || 'Pills');
       }
@@ -4097,13 +4178,47 @@
       wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
         btn.classList.remove('active');
       });
+      
+      if (group === 'scale') {
+        const combinedX = wrapper.querySelector('.scale-x-combined');
+        if (combinedX) {
+          combinedX.classList.remove('active');
+        }
+      }
+
       button.classList.add('active');
+    }
+
+    function selectScaleX(button) {
+      currentPrescriptionDraft.scale = 'x';
+      const wrapper = button.closest('[data-prescription-group]');
+      wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      const combinedX = wrapper.querySelector('.scale-x-combined');
+      if (combinedX) {
+        combinedX.classList.add('active');
+      }
+    }
+
+    function activateScaleX() {
+      const input = document.getElementById('prescription-scale-number');
+      const wrapper = input.closest('[data-prescription-group]');
+      if (!wrapper) return;
+      currentPrescriptionDraft.scale = 'x';
+      wrapper.querySelectorAll('.choice-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      const combinedX = wrapper.querySelector('.scale-x-combined');
+      if (combinedX) {
+        combinedX.classList.add('active');
+      }
     }
 
     function savePrescriptionItem() {
       const existingItem = editingPrescriptionIndex >= 0 ? normalizePrescriptionItem(currentPrescriptions[editingPrescriptionIndex]) : null;
       const medicine = document.getElementById('prescription-medicine').value.trim() || getPrescriptionMedicine(existingItem);
-      const potency = document.getElementById('prescription-potency').value.trim() || currentPrescriptionDraft.potency || 'ANY';
+      const potency = document.getElementById('prescription-potency').value.trim() || currentPrescriptionDraft.potency || '';
       const scaleNumberRaw = document.getElementById('prescription-scale-number').value.trim();
       const scaleNumber = scaleNumberRaw ? Math.max(1, Math.min(100, parseInt(scaleNumberRaw, 10) || 1)) : '';
       const duration = document.getElementById('prescription-duration').value.trim();
@@ -4117,7 +4232,7 @@
         medicine: medicine,
         potency: potency,
         scaleNumber: scaleNumber,
-        scale: currentPrescriptionDraft.scale || '',
+        scale: scaleNumber ? (currentPrescriptionDraft.scale || 'x') : '',
         vehicle: normalizePrescriptionVehicle(currentPrescriptionDraft.vehicle) || 'Pills',
         duration: duration,
         instructions: instructions,
@@ -4512,10 +4627,16 @@ Response format MUST be a JSON object with this exact structure:
           // Normalize prescription objects
           currentPrescriptions = structuredData.prescriptions.map(item => {
             const medicineName = item.medicine || item.medicineName || item.name || '';
+            let parsedScale = String(item.scale || '').trim().toLowerCase();
+            if (parsedScale === 'x' || parsedScale === 'lm' || parsedScale === 'q') {
+              // Valid scale
+            } else {
+              parsedScale = '';
+            }
             return {
               medicine: medicineName,
-              potency: item.potency || 'ANY',
-              scale: item.scale || '',
+              potency: (item.potency === 'ANY' || item.potency === 'any') ? '' : (item.potency || ''),
+              scale: parsedScale,
               scaleNumber: item.scaleNumber || '',
               duration: item.duration || '',
               vehicle: item.vehicle || 'Pills',
@@ -4724,10 +4845,16 @@ Response format MUST be a JSON object with this exact structure:
           // Normalize prescription objects
           currentPrescriptions = structuredData.prescriptions.map(item => {
             const medicineName = item.medicine || item.medicineName || item.name || '';
+            let parsedScale = String(item.scale || '').trim().toLowerCase();
+            if (parsedScale === 'x' || parsedScale === 'lm' || parsedScale === 'q') {
+              // Valid scale
+            } else {
+              parsedScale = '';
+            }
             return {
               medicine: medicineName,
-              potency: item.potency || 'ANY',
-              scale: item.scale || '',
+              potency: (item.potency === 'ANY' || item.potency === 'any') ? '' : (item.potency || ''),
+              scale: parsedScale,
               scaleNumber: item.scaleNumber || '',
               duration: item.duration || '',
               vehicle: item.vehicle || 'Pills',
@@ -5344,8 +5471,11 @@ Response format MUST be a JSON object with this exact structure:
           <span class="detail-field-label">Prescription</span>
           <span class="detail-field-value">
             ${prescriptions.length ? prescriptions.map(function(item) {
+              const potencyVal = item.potency && item.potency !== 'ANY' ? item.potency : '';
+              const scalePart = (item.scaleNumber || '') + (item.scale || '');
+              const potencyStr = potencyVal || scalePart ? (potencyVal + scalePart) : '';
               const meta = [
-                item.potency ? 'Potency: ' + item.potency + (item.scaleNumber || '') + (item.scale || '') : '',
+                potencyStr ? 'Potency: ' + potencyStr : '',
                 normalizePrescriptionVehicle(item.vehicle),
                 item.duration ? 'Duration: ' + item.duration : ''
               ].filter(Boolean).join(' | ');
